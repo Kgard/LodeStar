@@ -16,6 +16,7 @@ Commands:
   lodestar start [path]            Load context from your last session
   lodestar save [path]             Save a mid-session checkpoint
   lodestar end [path]              End session — synthesize + commit
+  lodestar review [path] [--diff]  Open session context in the browser
 
   lodestar init                    First-time setup (provider + API key)
   lodestar help                    Show this message
@@ -148,6 +149,14 @@ async function main(): Promise<void> {
     case "end":
       await runEnd(args);
       break;
+    case "review": {
+      const { runReview } = await import("./review.js");
+      const showDiff = args.includes("--diff");
+      const pathArgs = args.filter((a) => !a.startsWith("--"));
+      const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
+      await runReview({ projectRoot, showDiff });
+      break;
+    }
     case "help":
     case "--help":
     case "-h":
