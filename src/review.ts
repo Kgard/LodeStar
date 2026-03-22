@@ -1,16 +1,18 @@
-// lodestar review — local HTTP server + browser open
+// lodestar review — serves session context in the browser
 
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import fs from "node:fs/promises";
-import open from "open";
+import os from "node:os";
+import { exec } from "node:child_process";
 import { parseMarkdown, type LodestarContext } from "./schema.js";
 import { renderReaderHTML } from "./reader/template.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const HISTORY_DIR = ".lodestar.history";
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const PREFERRED_PORT = 7357;
 
 async function readContext(projectRoot: string): Promise<LodestarContext | null> {
   try {
@@ -35,6 +37,16 @@ async function readLatestHistory(projectRoot: string): Promise<LodestarContext |
   }
 }
 
+async function tryPort(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const test = http.createServer();
+    test.once("error", () => resolve(false));
+    test.listen(port, "127.0.0.1", () => {
+      test.close(() => resolve(true));
+    });
+  });
+}
+
 export async function runReview(options: {
   projectRoot: string;
   showDiff: boolean;
@@ -48,10 +60,19 @@ export async function runReview(options: {
 
   const html = renderReaderHTML(context, historyContext);
 
+  // Write HTML to a temp file as primary approach — most reliable with Safari
+  const tmpFile = path.join(os.tmpdir(), `lodestar-review-${Date.now()}.html`);
+  await fs.writeFile(tmpFile, html, "utf-8");
+
+  console.error(`Lodestar reader saved to ${tmpFile}`);
+  console.error("Opening in browser...");
+
+  exec(`open "${tmpFile}"`);
+
+  // Also start a server for refresh/bookmarking
   let idleTimer: ReturnType<typeof setTimeout>;
 
   const server = http.createServer((_req, res) => {
-    // Reset idle timer on every request
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       console.error("Lodestar reader: idle timeout, shutting down.");
@@ -63,13 +84,13 @@ export async function runReview(options: {
     res.end(html);
   });
 
-  server.listen(0, "127.0.0.1", async () => {
-    const { port } = server.address() as AddressInfo;
-    console.error(`Lodestar reader open at http://localhost:${port} — press Ctrl+C to close`);
-    await open(`http://localhost:${port}`);
+  const port = (await tryPort(PREFERRED_PORT)) ? PREFERRED_PORT : 0;
+
+  server.listen(port, "127.0.0.1", () => {
+    const actualPort = (server.address() as AddressInfo).port;
+    console.error(`Also serving at http://127.0.0.1:${actualPort} — press Ctrl+C to close`);
   });
 
-  // Start idle timer
   idleTimer = setTimeout(() => {
     console.error("Lodestar reader: idle timeout, shutting down.");
     server.close();
@@ -79,6 +100,8 @@ export async function runReview(options: {
   process.on("SIGINT", () => {
     clearTimeout(idleTimer);
     server.close();
+    // Clean up temp file
+    fs.unlink(tmpFile).catch(() => {});
     process.exit(0);
   });
 }

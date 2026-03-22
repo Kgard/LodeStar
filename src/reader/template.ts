@@ -83,6 +83,11 @@ export function renderReaderHTML(
   }
 
   const c = context;
+  const featureCount = (c.features ?? []).length;
+  const completedFeatures = (c.features ?? []).filter((f) => f.status === "complete").length;
+  const overallPercent = featureCount > 0
+    ? Math.round((c.features ?? []).reduce((sum, f) => sum + f.percentComplete, 0) / featureCount)
+    : 0;
   const decisionCount = c.decisions.length;
   const patternCount = c.patterns.length;
   const depCount = c.dependencies.length;
@@ -272,6 +277,87 @@ body {
 }
 .footer a { color: var(--brass); text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
+.brief-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+.brief-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.brief-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal); font-weight: 600; }
+.brief-overall { font-size: 1.25rem; font-weight: 700; color: var(--brass); }
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.feature-row:last-child { border-bottom: none; }
+.feature-status {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: center;
+}
+.status-complete { background: var(--add); color: white; }
+.status-in-progress { background: var(--change); color: white; }
+.status-not-started { background: var(--border); color: var(--text-muted); }
+.feature-name { flex: 1; font-weight: 500; }
+.feature-notes { color: var(--text-muted); font-size: 0.8rem; }
+.feature-bar-wrap {
+  width: 80px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.feature-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.feature-pct { font-size: 0.8rem; color: var(--text-muted); width: 35px; text-align: right; flex-shrink: 0; }
+.integrations-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.integration-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+.integration-name { font-weight: 600; color: var(--text); }
+.integration-cat {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--teal);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+.integration-purpose { color: var(--text-muted); font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -285,20 +371,56 @@ body {
 
 ${diffHtml}
 
-<div class="summary">
-  ${escapeHtml(firstNext)}
+${c.projectSummary ? `
+<div class="brief-section" style="margin-bottom:1rem">
+  <div class="brief-title" style="margin-bottom:0.5rem">Project Overview</div>
+  <div style="font-size:0.95rem;margin-bottom:0.75rem">${escapeHtml(c.projectSummary)}</div>
+  ${(c.userSegments ?? []).length > 0 ? `
+  <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+    ${(c.userSegments ?? []).map((s) => `<span style="font-size:0.75rem;padding:0.2rem 0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:12px;color:var(--text-muted)">${escapeHtml(s)}</span>`).join("")}
+  </div>` : ""}
 </div>
+` : ""}
+
+${(c.integrations ?? []).length > 0 ? `
+<div class="brief-section" style="margin-bottom:1rem">
+  <div class="brief-title" style="margin-bottom:0.5rem">Integrations & Services</div>
+  <div class="integrations-grid">
+    ${(c.integrations ?? []).map((i) => `
+    <div class="integration-chip">
+      <span class="integration-name">${escapeHtml(i.name)}</span>
+      <span class="integration-cat">${escapeHtml(i.category)}</span>
+    </div>`).join("")}
+  </div>
+</div>
+` : ""}
+
+${featureCount > 0 ? `
+<div class="brief-section">
+  <div class="brief-header">
+    <span class="brief-title">Project Brief Status</span>
+    <span class="brief-overall">${overallPercent}% complete</span>
+  </div>
+  ${(c.features ?? []).map((f) => {
+    const barColor = f.status === "complete" ? "var(--add)" : f.status === "in-progress" ? "var(--change)" : "var(--border)";
+    const statusClass = f.status === "complete" ? "status-complete" : f.status === "in-progress" ? "status-in-progress" : "status-not-started";
+    const statusLabel = f.status === "complete" ? "Done" : f.status === "in-progress" ? "In Progress" : "Not Started";
+    return `
+  <div class="feature-row">
+    <span class="feature-status ${statusClass}">${statusLabel}</span>
+    <span class="feature-name">${escapeHtml(f.feature)}${f.notes ? `<br><span class="feature-notes">${escapeHtml(f.notes)}</span>` : ""}</span>
+    <div class="feature-bar-wrap"><div class="feature-bar" style="width:${f.percentComplete}%;background:${barColor}"></div></div>
+    <span class="feature-pct">${f.percentComplete}%</span>
+  </div>`;
+  }).join("")}
+</div>
+` : ""}
 
 <div class="badges">
   <div class="badge"><span class="badge-count">${decisionCount}</span><span class="badge-label">Decisions</span></div>
   <div class="badge"><span class="badge-count">${patternCount}</span><span class="badge-label">Patterns</span></div>
   <div class="badge"><span class="badge-count">${depCount}</span><span class="badge-label">Deps</span></div>
   <div class="badge"><span class="badge-count" ${blockingCount > 0 ? 'style="color:var(--blocking)"' : ""}>${questionCount}</span><span class="badge-label">Questions</span></div>
-</div>
-
-<div class="next-preview">
-  <div class="next-label">Next session</div>
-  ${escapeHtml(firstNext)}
 </div>
 
 <!-- Level 2 -->
@@ -328,18 +450,6 @@ ${diffHtml}
       ${escapeHtml(q.question)}
       ${q.blocking ? '<span class="blocking-tag">blocking</span>' : '<span class="nonblocking-tag">non-blocking</span>'}
     </div>`).join("")}
-  </div>
-</div>
-
-<div class="section">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span><span class="arrow">&#9656;</span> Next Session Briefing</span>
-    <span class="section-badge">${c.nextSession.length}</span>
-  </div>
-  <div class="section-body">
-    <ul class="next-list">
-      ${c.nextSession.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
-    </ul>
   </div>
 </div>
 

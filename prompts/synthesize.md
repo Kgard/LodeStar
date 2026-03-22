@@ -61,6 +61,19 @@ interface LodestarContext {
     model: string;         // the model that generated this synthesis
     sessionDuration?: string;
   };
+  projectSummary: string;    // 1-2 sentence summary of what the project is and its intended outcomes
+  userSegments: string[];    // who this project is for (e.g. "Solo founders using AI coding tools", "First-time app builders")
+  integrations: Array<{
+    name: string;              // service or platform name (e.g. "Supabase", "GitHub", "Vercel", "Stripe")
+    category: "database" | "auth" | "hosting" | "api" | "ci-cd" | "monitoring" | "storage" | "payments" | "other";
+    purpose: string;           // what it's used for in this project
+  }>;
+  features: Array<{
+    feature: string;           // feature name from project brief
+    status: "not-started" | "in-progress" | "complete";
+    percentComplete: number;   // 0-100
+    notes?: string;            // brief status note
+  }>;
   decisions: Array<{
     decision: string;      // what was decided
     rationale: string;     // why
@@ -94,4 +107,5 @@ interface LodestarContext {
 - Keep nextSession to 3-5 items, ordered by importance
 - If existing context is provided, carry forward any still-relevant decisions, patterns, and open questions — do not drop context just because it wasn't in this session's diff
 - If there are no changes in a category, use an empty array — do not omit the field
+- For features: identify the major features/capabilities the project is building based on the code, brief, and existing context. Assess each feature's completion honestly — "not-started" means no code exists, "in-progress" means partial implementation, "complete" means fully functional. percentComplete should reflect actual working code, not just file existence. If existing context has features, carry them forward and update their status based on the current diff.
 - Output ONLY the JSON block, no other text

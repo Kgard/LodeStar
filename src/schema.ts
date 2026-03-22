@@ -33,8 +33,25 @@ export interface LodestarOpenQuestion {
   blocking: boolean;
 }
 
+export interface LodestarFeature {
+  feature: string;
+  status: "not-started" | "in-progress" | "complete";
+  percentComplete: number;
+  notes?: string;
+}
+
+export interface LodestarIntegration {
+  name: string;
+  category: "database" | "auth" | "hosting" | "api" | "ci-cd" | "monitoring" | "storage" | "payments" | "other";
+  purpose: string;
+}
+
 export interface LodestarContext {
   meta: LodestarMeta;
+  projectSummary: string;
+  userSegments: string[];
+  integrations: LodestarIntegration[];
+  features: LodestarFeature[];
   decisions: LodestarDecision[];
   patterns: LodestarPattern[];
   dependencies: LodestarDependency[];
@@ -53,6 +70,40 @@ export function contextToMarkdown(ctx: LodestarContext): string {
   lines.push(`> Model: ${ctx.meta.model}`);
   if (ctx.meta.sessionDuration) {
     lines.push(`> Session Duration: ${ctx.meta.sessionDuration}`);
+  }
+  lines.push("");
+
+  lines.push("## Project Summary");
+  lines.push("");
+  lines.push(ctx.projectSummary || "No project summary available.");
+  lines.push("");
+  if (ctx.userSegments && ctx.userSegments.length > 0) {
+    lines.push("**User Segments:**");
+    for (const seg of ctx.userSegments) {
+      lines.push(`- ${seg}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Integrations");
+  lines.push("");
+  if (!ctx.integrations || ctx.integrations.length === 0) {
+    lines.push("No integrations detected.");
+  }
+  for (const i of ctx.integrations ?? []) {
+    lines.push(`- **${i.name}** [${i.category}] — ${i.purpose}`);
+  }
+  lines.push("");
+
+  lines.push("## Project Brief Status");
+  lines.push("");
+  if (!ctx.features || ctx.features.length === 0) {
+    lines.push("No features tracked.");
+  }
+  for (const f of ctx.features ?? []) {
+    const bar = f.percentComplete;
+    const icon = f.status === "complete" ? "[x]" : f.status === "in-progress" ? "[-]" : "[ ]";
+    lines.push(`- ${icon} **${f.feature}** — ${bar}%${f.notes ? ` — ${f.notes}` : ""}`);
   }
   lines.push("");
 
@@ -130,6 +181,10 @@ export function contextToMarkdown(ctx: LodestarContext): string {
 export function parseMarkdown(content: string): LodestarContext {
   const ctx: LodestarContext = {
     meta: { project: "", date: "", model: "" },
+    projectSummary: "",
+    userSegments: [],
+    integrations: [],
+    features: [],
     decisions: [],
     patterns: [],
     dependencies: [],
@@ -160,6 +215,66 @@ export function parseMarkdown(content: string): LodestarContext {
     const m = content.match(re);
     return m ? m[1].trim() : "";
   };
+
+  // Project Summary
+  const summaryBlock = sectionContent("Project Summary");
+  const summaryLines = summaryBlock.split("\n");
+  const summaryText: string[] = [];
+  const segments: string[] = [];
+  let inSegments = false;
+  for (const line of summaryLines) {
+    if (line.startsWith("**User Segments:**")) {
+      inSegments = true;
+      continue;
+    }
+    if (inSegments && line.startsWith("- ")) {
+      segments.push(line.slice(2).trim());
+    } else if (!inSegments && line.trim()) {
+      summaryText.push(line.trim());
+    }
+  }
+  ctx.projectSummary = summaryText.join(" ");
+  ctx.userSegments = segments;
+
+  // Project Brief Status / Features
+  // Integrations
+  const integrationsBlock = sectionContent("Integrations");
+  const integrationLines = integrationsBlock
+    .split("\n")
+    .filter((l) => l.startsWith("- "));
+  for (const line of integrationLines) {
+    const m = line.match(/^- \*\*(.+?)\*\*\s*\[(.+?)\]\s*—\s*(.+)$/);
+    if (m) {
+      ctx.integrations.push({
+        name: m[1],
+        category: m[2] as LodestarIntegration["category"],
+        purpose: m[3].trim(),
+      });
+    }
+  }
+
+  const featuresBlock = sectionContent("Project Brief Status") || sectionContent("Project Brief");
+  const featureLines = featuresBlock
+    .split("\n")
+    .filter((l) => l.startsWith("- "));
+  for (const line of featureLines) {
+    const m = line.match(/^- \[(x| |-)\]\s*\*\*(.+?)\*\*\s*—\s*(\d+)%(?:\s*—\s*(.+))?$/);
+    if (m) {
+      const statusChar = m[1];
+      const status =
+        statusChar === "x"
+          ? "complete"
+          : statusChar === "-"
+            ? "in-progress"
+            : "not-started";
+      ctx.features.push({
+        feature: m[2],
+        status: status as "not-started" | "in-progress" | "complete",
+        percentComplete: parseInt(m[3], 10),
+        ...(m[4] ? { notes: m[4].trim() } : {}),
+      });
+    }
+  }
 
   // Decisions
   const decisionsBlock = sectionContent("Decisions");

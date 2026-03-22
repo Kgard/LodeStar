@@ -11,14 +11,21 @@
 Lodestar is an MCP server that solves **session amnesia** in Claude Code. Every Claude Code session starts cold — no memory of architectural decisions, established patterns, rejected approaches, or open questions. Lodestar synthesizes the current session into a structured `.lodestar.md` context file that loads at the next session start, giving Claude Code a warm boot.
 
 **Phase 1a scope — the only thing being built right now:**
-- `lodestar_synthesize()` — reads current session file diffs, synthesizes via Claude API, writes `.lodestar.md`
+- `lodestar_synthesize()` — reads current session file diffs, synthesizes via LLM, writes `.lodestar.md`
 - `lodestar_load()` — reads `.lodestar.md`, returns structured context for session initialization
+- `lodestar init` — first-run CLI wizard: provider selection, key validation, config creation
+- `lodestar review` — CLI command that opens a browser-based progressive disclosure reader for the current `.lodestar.md`
+
+**Sequencing within Phase 1a — build in this order:**
+1. `lodestar init` — prerequisite for everything else
+2. `lodestar_synthesize` + `lodestar_load` — core MCP tools; must pass 10-session gate before proceeding
+3. `lodestar review` — polish item built after synthesize/load are stable
 
 **Not in scope for Phase 1a (do not build):**
 - Passive background watching or automatic session-end firing (Phase 2)
 - Cross-project diffing (Phase 3)
-- Any UI, dashboard, or web interface
 - `lodestar_diff()` drift detection (Phase 1b — next phase, not this one)
+- Any persistent web server or cloud-hosted UI
 
 If a feature idea arises that belongs to a later phase, add it to `## Future Phases` at the bottom of this file and continue. Do not implement it.
 
@@ -61,6 +68,7 @@ lodestar/
 │   ├── init.ts                   ← lodestar init CLI wizard
 │   ├── synthesize.ts             ← lodestar_synthesize() implementation
 │   ├── load.ts                   ← lodestar_load() implementation
+│   ├── review.ts                 ← lodestar review — local HTTP server + browser open
 │   ├── diff.ts                   ← lodestar_diff() STUB ONLY — Phase 1b
 │   ├── git.ts                    ← Git diff utilities via simple-git
 │   ├── history.ts                ← .lodestar.history/ rotation logic
@@ -71,6 +79,8 @@ lodestar/
 │       ├── anthropic.ts          ← Anthropic implementation (default)
 │       ├── openai.ts             ← OpenAI implementation
 │       └── ollama.ts             ← Ollama local implementation
+├── src/reader/
+│   └── template.ts               ← Self-contained HTML reader (inline string, no external deps)
 ├── prompts/
 │   └── synthesize.md             ← The synthesis prompt (kept separate for iteration)
 ├── .lodestar.md                  ← Always current — committed to Git
@@ -529,6 +539,226 @@ API keys and provider settings live in `~/.lodestar.config.json` — set by `lod
 
 ---
 
+## `lodestar review` — web reader
+
+`lodestar review` opens a browser-based progressive disclosure reader for the current project's `.lodestar.md`. It is the primary human-facing surface of Lodestar — the thing a user looks at to understand what happened in the last session before starting a new one. It is also the community candy screenshot: the thing people share.
+
+**Invocation:**
+```bash
+lodestar review                              # reads .lodestar.md in current directory
+lodestar review --project /path/to/project  # explicit project path
+lodestar review --diff                      # shows changes vs. previous session
+```
+
+---
+
+### Server lifecycle
+
+`lodestar review` is a short-lived local HTTP server. It does not run persistently.
+
+```
+1. Find a random available port (prefer 7357, fallback to any open port)
+2. Spin up a Node.js http server on localhost:{port}
+3. Open http://localhost:{port} in the default browser via `open` package
+4. Serve the self-contained HTML reader page (single response, no file watching)
+5. Print to terminal: "Lodestar reader open at http://localhost:{port} — press Ctrl+C to close"
+6. Auto-shutdown after 10 minutes idle (no browser requests)
+7. Shutdown cleanly on Ctrl+C
+```
+
+**Rules:**
+- Single-use server — not a dev server, not a file watcher
+- No WebSocket, no SSE, no live reload
+- The HTML page is fully self-contained — served as a single string from `src/reader/template.ts`
+- No external CDN calls from the served page — everything inline
+- Works offline
+
+---
+
+### Progressive disclosure — three levels
+
+The reader presents the `.lodestar.md` context at three levels of depth. The user controls what they expand. The goal: **understand the session in 5 seconds at Level 1, reconstruct full context in 2 minutes at Level 3.**
+
+```
+╔══════════════════════════════════════════════════════════╗
+║  LEVEL 1 — Always visible (zero cognitive load)          ║
+╠══════════════════════════════════════════════════════════╣
+║  ⭐ Lodestar  •  [project name]                          ║
+║  Session: [date]  •  [model]                             ║
+║                                                          ║
+║  [One-sentence session summary]                          ║
+║                                                          ║
+║  ┌──────────┬──────────┬──────────┬──────────┐          ║
+║  │ 4        │ 2        │ 3        │ 1        │          ║
+║  │ Decisions│ Patterns │ Deps     │ Questions│          ║
+║  └──────────┴──────────┴──────────┴──────────┘          ║
+║                                                          ║
+║  Next session: [first bullet from nextSession[]]  ▼      ║
+╚══════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════╗
+║  LEVEL 2 — Expand on click (moderate interest)           ║
+╠══════════════════════════════════════════════════════════╣
+║  ▼ DECISIONS                                             ║
+║    • [decision title] — [rationale]          [files ▶]  ║
+║    • [decision title] — [rationale]          [files ▶]  ║
+║                                                          ║
+║  ▼ OPEN QUESTIONS                                        ║
+║    • [question]                         [blocking: yes]  ║
+║    • [question]                         [blocking: no]   ║
+║                                                          ║
+║  ▼ NEXT SESSION BRIEFING                                 ║
+║    • [bullet 1]                                          ║
+║    • [bullet 2]                                          ║
+║    • [bullet 3]                                          ║
+╚══════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════╗
+║  LEVEL 3 — Deep drill (active investigation)             ║
+╠══════════════════════════════════════════════════════════╣
+║  ▼ PATTERNS                                              ║
+║    • [pattern] → [file location]                         ║
+║                                                          ║
+║  ▼ DEPENDENCIES                                          ║
+║    • [package] — added for: [purpose]                    ║
+║                                                          ║
+║  ▼ REJECTED APPROACHES                                   ║
+║    • [approach] — rejected because: [reason]             ║
+╚══════════════════════════════════════════════════════════╝
+```
+
+**Disclosure rules:**
+- Level 1 is always visible — never collapsible
+- Level 2 sections are collapsed by default, expand on click
+- Level 3 sections are collapsed by default, nested inside Level 2 where relevant
+- State persists within the session (expand once, stays expanded on scroll)
+- Each section header shows a count badge when collapsed: `DECISIONS (4)`
+- Blocking open questions get a visual warning indicator — they cannot be missed
+- The `nextSession` bullets are always at Level 1 — they are the most important single piece of context
+
+---
+
+### Diff view — `--diff` flag
+
+When `--diff` is passed and a `.lodestar.history/` file exists, the reader shows a **changes panel** above the main content:
+
+```
+╔══════════════════════════════════════════════════════════╗
+║  CHANGES SINCE LAST SESSION  •  2 days ago               ║
+╠══════════════════════════════════════════════════════════╣
+║  + 2 new decisions                                       ║
+║  + 1 new dependency (simple-git)                         ║
+║  ~ 1 decision updated (auth approach changed)            ║
+║  - 1 open question resolved (DB schema — no longer open) ║
+╚══════════════════════════════════════════════════════════╝
+```
+
+**Diff rules:**
+- Compare current `.lodestar.md` against most recent `.lodestar.history/` file
+- Additions shown in green `+`
+- Modifications shown in amber `~`
+- Removals shown in muted red `-`
+- Diff panel is Level 1 visibility — always shown when `--diff` is passed
+- No diff panel if no history file exists — show a subtle note: "No previous session to compare"
+
+---
+
+### UI design principles
+
+- **No external dependencies** — the served HTML is a self-contained string in `src/reader/template.ts`. No CDN imports, no Google Fonts, no external JS. The reader must work completely offline.
+- **System fonts** — use `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`. Do not import fonts.
+- **Keelson color palette** — deep navy `#1B2C4A` for headers, nautical teal `#1A6B72` for accents, brass `#C8A84B` for the Lodestar mark and section badges, warm white `#F8F9FA` background.
+- **Dark mode aware** — use `prefers-color-scheme: dark` media query. Dark background: `#0D1117`, dark surface: `#161B22`.
+- **Readable at a glance** — minimum 16px body text, generous line height (1.6), clear section separation.
+- **One interaction per element** — click to expand/collapse. No hover-only states. No tooltips required to understand the UI.
+- **Mobile-capable** — the reader may be viewed on a phone. Max-width container (760px), responsive at 375px minimum.
+- **Keelson footer** — every reader page includes a subtle footer: `Lodestar · Keelson Module 00 · keelson.io`. This is the community candy brand impression.
+
+---
+
+### Implementation notes
+
+```typescript
+// src/review.ts — structure only
+
+import http from 'http';
+import { AddressInfo } from 'net';
+import open from 'open';
+import { readLodestarContext } from './load.js';
+import { readHistoryContext } from './history.js';
+import { renderReaderHTML } from './reader/template.js';
+
+export async function runReview(options: {
+  projectRoot: string;
+  showDiff: boolean;
+}): Promise<void> {
+  const context = await readLodestarContext(options.projectRoot);
+  const historyContext = options.showDiff
+    ? await readHistoryContext(options.projectRoot, 1)  // most recent history file
+    : null;
+
+  const html = renderReaderHTML(context, historyContext);
+
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
+  });
+
+  // Find available port, prefer 7357
+  server.listen(0, '127.0.0.1', async () => {
+    const { port } = server.address() as AddressInfo;
+    console.error(`Lodestar reader open at http://localhost:${port} — press Ctrl+C to close`);
+    await open(`http://localhost:${port}`);
+  });
+
+  // Auto-shutdown after 10 minutes idle
+  const timeout = setTimeout(() => {
+    console.error('Lodestar reader: idle timeout, shutting down.');
+    server.close();
+    process.exit(0);
+  }, 10 * 60 * 1000);
+
+  process.on('SIGINT', () => {
+    clearTimeout(timeout);
+    server.close();
+    process.exit(0);
+  });
+}
+```
+
+```typescript
+// src/reader/template.ts — structure only
+// Returns a complete, self-contained HTML string
+// All CSS and JS is inline — no external imports
+
+export function renderReaderHTML(
+  context: LodestarContext | null,
+  historyContext: LodestarContext | null
+): string {
+  // Returns full HTML document as a string
+  // CSS variables map to Keelson palette
+  // JS handles accordion expand/collapse — vanilla only, no framework
+  // Diff panel rendered only when historyContext is not null
+}
+```
+
+---
+
+### `bin` update — add review to CLI
+
+```json
+{
+  "bin": {
+    "lodestar": "./dist/init.js",
+    "lodestar-review": "./dist/review.js"
+  }
+}
+```
+
+Or handle as a subcommand within the main `lodestar` binary using argv parsing — `lodestar review` dispatches to `runReview()`. Prefer the single binary approach: cleaner for the user.
+
+---
+
 ## Build and run
 
 ```bash
@@ -536,8 +766,6 @@ API keys and provider settings live in `~/.lodestar.config.json` — set by `lod
 npm install
 
 # First-time setup (users run this once)
-npm run init         # runs lodestar init wizard
-# or after global install:
 lodestar init
 
 # Build
@@ -549,8 +777,10 @@ npm run dev          # tsc --watch
 # Test MCP server manually
 node dist/index.js   # send MCP messages via stdin
 
-# Test synthesis against this project
-# Call lodestar_synthesize with projectRoot = absolute path to this directory
+# Open the web reader for a project
+lodestar review
+lodestar review --project /path/to/project
+lodestar review --diff   # shows changes vs. previous session
 ```
 
 **Required npm packages:**
@@ -574,16 +804,22 @@ node dist/index.js   # send MCP messages via stdin
 }
 ```
 
+Note: `http` is a Node.js built-in — no extra package needed for the review server. Port detection uses `server.listen(0)` (OS assigns a free port) with a preference fallback to 7357 handled in `review.ts`.
+
 ---
 
 ## Phase gates
 
-**Do not move to Phase 1b until:**
-- [ ] `lodestar_synthesize` writes a valid `.lodestar.md` in 10 consecutive personal sessions
-- [ ] `lodestar_load` returns clean context that requires no manual editing before use
+**Do not build `lodestar review` until:**
+- [ ] `lodestar_synthesize` produces clean `.lodestar.md` in 10 consecutive personal sessions
+- [ ] `lodestar_load` returns clean context with no manual editing required
+
+**Do not move to Phase 1b until all of the above plus:**
+- [ ] `lodestar review` opens cleanly and renders all three disclosure levels correctly
 - [ ] Session ramp time reduced by >50% (measured subjectively by Ken)
-- [ ] No Claude API errors in normal operation
-- [ ] Both tools registered and callable from Claude Desktop
+- [ ] No provider API errors in normal operation
+- [ ] MCP tools registered and callable from Claude Desktop
+- [ ] `lodestar review --diff` renders a meaningful changes panel when history exists
 
 **Phase 1b adds (do not implement now):**
 - `lodestar_diff({ projectRoot, referenceDoc })` — compares current `.lodestar.md` against a brief or prior context file; returns contradiction list
