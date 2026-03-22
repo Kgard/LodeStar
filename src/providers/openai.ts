@@ -21,7 +21,7 @@ export class OpenAIProvider implements LLMProvider {
   async synthesize(prompt: string, input: string): Promise<string> {
     const response = await this.client.chat.completions.create({
       model: this.model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [{ role: "user", content: `${prompt}\n\n${input}` }],
     });
 

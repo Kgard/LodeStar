@@ -46,12 +46,26 @@ export interface LodestarIntegration {
   purpose: string;
 }
 
+export interface LodestarFuturePhase {
+  phase: string;
+  description: string;
+  items: string[];
+}
+
+export interface LodestarDiagram {
+  title: string;
+  type: "architecture" | "flow" | "sequence" | "dependency";
+  mermaid: string;
+}
+
 export interface LodestarContext {
   meta: LodestarMeta;
   projectSummary: string;
   userSegments: string[];
   integrations: LodestarIntegration[];
   features: LodestarFeature[];
+  futurePhases: LodestarFuturePhase[];
+  diagrams: LodestarDiagram[];
   decisions: LodestarDecision[];
   patterns: LodestarPattern[];
   dependencies: LodestarDependency[];
@@ -106,6 +120,35 @@ export function contextToMarkdown(ctx: LodestarContext): string {
     lines.push(`- ${icon} **${f.feature}** — ${bar}%${f.notes ? ` — ${f.notes}` : ""}`);
   }
   lines.push("");
+
+  lines.push("## Future Phases");
+  lines.push("");
+  if (!ctx.futurePhases || ctx.futurePhases.length === 0) {
+    lines.push("No future phases defined.");
+  }
+  for (const p of ctx.futurePhases ?? []) {
+    lines.push(`### ${p.phase}`);
+    lines.push("");
+    lines.push(p.description);
+    for (const item of p.items) {
+      lines.push(`- ${item}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Diagrams");
+  lines.push("");
+  if (!ctx.diagrams || ctx.diagrams.length === 0) {
+    lines.push("No diagrams.");
+  }
+  for (const d of ctx.diagrams ?? []) {
+    lines.push(`### ${d.title} [${d.type}]`);
+    lines.push("");
+    lines.push("```mermaid");
+    lines.push(d.mermaid);
+    lines.push("```");
+    lines.push("");
+  }
 
   lines.push("## Decisions");
   lines.push("");
@@ -185,6 +228,8 @@ export function parseMarkdown(content: string): LodestarContext {
     userSegments: [],
     integrations: [],
     features: [],
+    futurePhases: [],
+    diagrams: [],
     decisions: [],
     patterns: [],
     dependencies: [],
@@ -272,6 +317,50 @@ export function parseMarkdown(content: string): LodestarContext {
         status: status as "not-started" | "in-progress" | "complete",
         percentComplete: parseInt(m[3], 10),
         ...(m[4] ? { notes: m[4].trim() } : {}),
+      });
+    }
+  }
+
+  // Future Phases
+  const futureBlock = sectionContent("Future Phases");
+  const futureChunks = futureBlock.split(/^### /m).filter(Boolean);
+  for (const chunk of futureChunks) {
+    const titleEnd = chunk.indexOf("\n");
+    const title = titleEnd === -1 ? chunk.trim() : chunk.slice(0, titleEnd).trim();
+    const body = titleEnd === -1 ? "" : chunk.slice(titleEnd);
+    const bodyLines = body.split("\n").filter((l) => l.trim());
+    const items: string[] = [];
+    const descLines: string[] = [];
+    for (const line of bodyLines) {
+      if (line.startsWith("- ")) {
+        items.push(line.slice(2).trim());
+      } else {
+        descLines.push(line.trim());
+      }
+    }
+    ctx.futurePhases.push({
+      phase: title,
+      description: descLines.join(" "),
+      items,
+    });
+  }
+
+  // Diagrams
+  const diagramsBlock = sectionContent("Diagrams");
+  const diagramChunks = diagramsBlock.split(/^### /m).filter(Boolean);
+  for (const chunk of diagramChunks) {
+    const titleEnd = chunk.indexOf("\n");
+    const titleLine = titleEnd === -1 ? chunk.trim() : chunk.slice(0, titleEnd).trim();
+    const body = titleEnd === -1 ? "" : chunk.slice(titleEnd);
+    const titleMatch = titleLine.match(/^(.+?)\s*\[(\w+)\]\s*$/);
+    const title = titleMatch ? titleMatch[1].trim() : titleLine;
+    const type = (titleMatch ? titleMatch[2] : "architecture") as LodestarDiagram["type"];
+    const mermaidMatch = body.match(/```mermaid\s*\n([\s\S]*?)```/);
+    if (mermaidMatch) {
+      ctx.diagrams.push({
+        title,
+        type,
+        mermaid: mermaidMatch[1].trim(),
       });
     }
   }

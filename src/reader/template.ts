@@ -74,9 +74,51 @@ function renderDiffPanel(
   return lines.join("\n");
 }
 
+function markdownToHtml(md: string): string {
+  let html = escapeHtml(md);
+  // Headers
+  html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
+  html = html.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>');
+  html = html.replace(/^####\s+(.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^###\s+(.+)$/gm, '<h3 class="prd-h3">$1</h3>');
+  html = html.replace(/^##\s+(.+)$/gm, '<h2 class="prd-h2">$1</h2>');
+  html = html.replace(/^#\s+(.+)$/gm, '<h1 class="prd-h1">$1</h1>');
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code class="prd-code">$1</code>');
+  // Code blocks
+  html = html.replace(/```[\w]*\n([\s\S]*?)```/g, '<pre class="prd-pre"><code>$1</code></pre>');
+  // Horizontal rules
+  html = html.replace(/^---$/gm, '<hr class="prd-hr">');
+  // Tables (basic)
+  html = html.replace(/^\|(.+)\|$/gm, (match) => {
+    const cells = match.split('|').filter(Boolean).map((c) => c.trim());
+    if (cells.every((c) => /^-+$/.test(c))) return '';
+    const tag = 'td';
+    return '<tr>' + cells.map((c) => `<${tag} class="prd-td">${c}</${tag}>`).join('') + '</tr>';
+  });
+  // Wrap consecutive tr in table
+  html = html.replace(/(<tr>[\s\S]*?<\/tr>\n?)+/g, '<table class="prd-table">$&</table>');
+  // Unordered lists
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, '<ul class="prd-ul">$&</ul>');
+  // Blockquotes
+  html = html.replace(/^&gt;\s?(.+)$/gm, '<blockquote class="prd-quote">$1</blockquote>');
+  // Paragraphs (double newline)
+  html = html.replace(/\n\n/g, '</p><p class="prd-p">');
+  html = '<p class="prd-p">' + html + '</p>';
+  // Clean up empty paragraphs
+  html = html.replace(/<p class="prd-p">\s*<\/p>/g, '');
+  return html;
+}
+
 export function renderReaderHTML(
   context: LodestarContext | null,
-  historyContext: LodestarContext | null
+  historyContext: LodestarContext | null,
+  prd: { filename: string; content: string } | null = null
 ): string {
   if (!context) {
     return `<!DOCTYPE html><html><head><title>Lodestar</title></head><body><h1>No .lodestar.md found</h1><p>Run <code>lodestar save</code> or <code>lodestar end</code> to create one.</p></body></html>`;
@@ -358,6 +400,86 @@ body {
   border-radius: 4px;
 }
 .integration-purpose { color: var(--text-muted); font-size: 0.8rem; }
+.tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border);
+}
+.tab {
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  user-select: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.prd-h1 { font-size: 1.5rem; font-weight: 700; color: var(--navy); margin: 1.5rem 0 0.75rem; }
+.prd-h2 { font-size: 1.2rem; font-weight: 600; color: var(--teal); margin: 1.25rem 0 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+.prd-h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1rem 0 0.4rem; }
+.prd-p { margin: 0.5rem 0; line-height: 1.7; }
+.prd-ul { padding-left: 1.5rem; margin: 0.5rem 0; }
+.prd-ul li { margin: 0.3rem 0; }
+.prd-code { background: var(--bg); border: 1px solid var(--border); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.85em; font-family: 'SF Mono', 'Fira Code', monospace; }
+.prd-pre { background: var(--bg); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0.75rem 0; font-size: 0.85rem; line-height: 1.5; }
+.prd-pre code { background: none; border: none; padding: 0; font-family: 'SF Mono', 'Fira Code', monospace; }
+.prd-hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.prd-quote { border-left: 3px solid var(--brass); padding: 0.5rem 1rem; margin: 0.75rem 0; color: var(--text-muted); font-style: italic; }
+.prd-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.9rem; }
+.prd-td { padding: 0.4rem 0.75rem; border: 1px solid var(--border); }
+.prd-table tr:first-child .prd-td { font-weight: 600; background: var(--bg); }
+.prd-source { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; }
+.diagram-container { margin-bottom: 1rem; }
+.diagram-title { font-size: 0.85rem; font-weight: 600; color: var(--teal); margin-bottom: 0.5rem; }
+.diagram-type-tag {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+.mermaid-diagram {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  text-align: center;
+}
+.mermaid-fallback {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  white-space: pre;
+  text-align: left;
+  color: var(--text-muted);
+}
+.roadmap-phase { margin-bottom: 0.75rem; }
+.roadmap-phase-title { font-weight: 600; font-size: 0.9rem; color: var(--teal); margin-bottom: 0.25rem; }
+.roadmap-phase-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+.roadmap-items { list-style: none; padding: 0; }
+.roadmap-items li { font-size: 0.85rem; padding: 0.2rem 0; color: var(--text); }
+.roadmap-items li::before { content: "○ "; color: var(--brass); }
+.prd-future-note {
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 1.5rem;
+  text-align: center;
+}
 </style>
 </head>
 <body>
@@ -368,6 +490,13 @@ body {
   <span class="project">${escapeHtml(c.meta.project)}</span>
 </div>
 <div class="meta">Session: ${escapeHtml(c.meta.date)} &middot; ${escapeHtml(c.meta.model)}${c.meta.sessionDuration ? ` &middot; ${escapeHtml(c.meta.sessionDuration)}` : ""}</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('summary')">Project Summary</div>
+  <div class="tab" onclick="switchTab('requirements')">Project Requirements</div>
+</div>
+
+<div id="tab-summary" class="tab-content active">
 
 ${diffHtml}
 
@@ -413,6 +542,42 @@ ${featureCount > 0 ? `
     <span class="feature-pct">${f.percentComplete}%</span>
   </div>`;
   }).join("")}
+</div>
+` : ""}
+
+${(c.diagrams ?? []).length > 0 ? `
+<div class="section open">
+  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+    <span><span class="arrow">&#9656;</span> Architecture & Flows</span>
+    <span class="section-badge">${(c.diagrams ?? []).length}</span>
+  </div>
+  <div class="section-body">
+    ${(c.diagrams ?? []).map((d, i) => `
+    <div class="diagram-container">
+      <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
+      <div class="mermaid-diagram">
+        <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
+        <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
+      </div>
+    </div>`).join("")}
+  </div>
+</div>
+` : ""}
+
+${(c.futurePhases ?? []).length > 0 ? `
+<div class="section">
+  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+    <span><span class="arrow">&#9656;</span> Future Phases</span>
+    <span class="section-badge">${(c.futurePhases ?? []).length}</span>
+  </div>
+  <div class="section-body">
+    ${(c.futurePhases ?? []).map((p) => `
+    <div class="roadmap-phase">
+      <div class="roadmap-phase-title">${escapeHtml(p.phase)}</div>
+      ${p.description ? `<div class="roadmap-phase-desc">${escapeHtml(p.description)}</div>` : ""}
+      ${p.items.length > 0 ? `<ul class="roadmap-items">${p.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : ""}
+    </div>`).join("")}
+  </div>
 </div>
 ` : ""}
 
@@ -496,11 +661,65 @@ ${featureCount > 0 ? `
   </div>
 </div>
 
+</div><!-- end tab-summary -->
+
+<div id="tab-requirements" class="tab-content">
+${prd ? `
+  <div class="prd-source">Source: ${escapeHtml(prd.filename)}</div>
+  <div class="prd-content">
+    ${markdownToHtml(prd.content)}
+  </div>
+  <div class="prd-future-note">
+    Editing coming soon — changes will sync back to ${escapeHtml(prd.filename)}
+  </div>
+` : `
+  <div style="padding:2rem;text-align:center;color:var(--text-muted)">
+    <p>No project requirements document found.</p>
+    <p style="font-size:0.85rem;margin-top:0.5rem">Create a <strong>CLAUDE.md</strong>, <strong>PRD.md</strong>, or <strong>BRIEF.md</strong> in your project root.</p>
+  </div>
+`}
+</div><!-- end tab-requirements -->
+
 <div class="footer">
   Lodestar &middot; Keelson Module 00 &middot; <a href="https://keelson.io">keelson.io</a>
 </div>
 
 </div>
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector('.tab[onclick*="' + name + '"]').classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof mermaid !== 'undefined') {
+    var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: isDark ? 'dark' : 'default',
+      themeVariables: isDark ? {
+        primaryColor: '#1A6B72',
+        primaryBorderColor: '#30363D',
+        primaryTextColor: '#E2E8F0',
+        lineColor: '#8B949E',
+        secondaryColor: '#161B22',
+        tertiaryColor: '#0D1117'
+      } : {
+        primaryColor: '#1A6B72',
+        primaryBorderColor: '#E5E7EB',
+        primaryTextColor: '#1B2C4A',
+        lineColor: '#6B7280'
+      },
+      securityLevel: 'loose'
+    });
+    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+  }
+});
+</script>
 </body>
 </html>`;
 }

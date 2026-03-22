@@ -4,13 +4,13 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import fs from "node:fs/promises";
-import os from "node:os";
 import { exec } from "node:child_process";
 import { parseMarkdown, type LodestarContext } from "./schema.js";
 import { renderReaderHTML } from "./reader/template.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const HISTORY_DIR = ".lodestar.history";
+const PRD_FILENAMES = ["CLAUDE.md", "lodestar.md", "PRD.md", "BRIEF.md", "README.md"];
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const PREFERRED_PORT = 7357;
 
@@ -37,6 +37,18 @@ async function readLatestHistory(projectRoot: string): Promise<LodestarContext |
   }
 }
 
+async function readPrd(projectRoot: string): Promise<{ filename: string; content: string } | null> {
+  for (const name of PRD_FILENAMES) {
+    try {
+      const content = await fs.readFile(path.join(projectRoot, name), "utf-8");
+      return { filename: name, content };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 async function tryPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const test = http.createServer();
@@ -57,19 +69,11 @@ export async function runReview(options: {
   const historyContext = options.showDiff
     ? await readLatestHistory(resolved)
     : null;
+  const prd = await readPrd(resolved);
 
-  const html = renderReaderHTML(context, historyContext);
+  const html = renderReaderHTML(context, historyContext, prd);
 
-  // Write HTML to a temp file as primary approach — most reliable with Safari
-  const tmpFile = path.join(os.tmpdir(), `lodestar-review-${Date.now()}.html`);
-  await fs.writeFile(tmpFile, html, "utf-8");
-
-  console.error(`Lodestar reader saved to ${tmpFile}`);
-  console.error("Opening in browser...");
-
-  exec(`open "${tmpFile}"`);
-
-  // Also start a server for refresh/bookmarking
+  // Serve via HTTP — required for Mermaid CDN to load (file:// blocks network requests)
   let idleTimer: ReturnType<typeof setTimeout>;
 
   const server = http.createServer((_req, res) => {
@@ -88,7 +92,9 @@ export async function runReview(options: {
 
   server.listen(port, "127.0.0.1", () => {
     const actualPort = (server.address() as AddressInfo).port;
-    console.error(`Also serving at http://127.0.0.1:${actualPort} — press Ctrl+C to close`);
+    const url = `http://127.0.0.1:${actualPort}`;
+    console.error(`Lodestar reader at ${url} — press Ctrl+C to close`);
+    exec(`open "${url}"`);
   });
 
   idleTimer = setTimeout(() => {
@@ -100,8 +106,6 @@ export async function runReview(options: {
   process.on("SIGINT", () => {
     clearTimeout(idleTimer);
     server.close();
-    // Clean up temp file
-    fs.unlink(tmpFile).catch(() => {});
     process.exit(0);
   });
 }

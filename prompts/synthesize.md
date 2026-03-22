@@ -74,6 +74,16 @@ interface LodestarContext {
     percentComplete: number;   // 0-100
     notes?: string;            // brief status note
   }>;
+  futurePhases: Array<{
+    phase: string;             // phase name (e.g. "Phase 1b", "Phase 2")
+    description: string;       // what this phase adds
+    items: string[];           // specific features or capabilities planned
+  }>;
+  diagrams: Array<{
+    title: string;             // diagram name (e.g. "System Architecture", "Request Flow")
+    type: "architecture" | "flow" | "sequence" | "dependency";
+    mermaid: string;           // valid Mermaid.js diagram code
+  }>;
   decisions: Array<{
     decision: string;      // what was decided
     rationale: string;     // why
@@ -108,4 +118,5 @@ interface LodestarContext {
 - If existing context is provided, carry forward any still-relevant decisions, patterns, and open questions — do not drop context just because it wasn't in this session's diff
 - If there are no changes in a category, use an empty array — do not omit the field
 - For features: identify the major features/capabilities the project is building based on the code, brief, and existing context. Assess each feature's completion honestly — "not-started" means no code exists, "in-progress" means partial implementation, "complete" means fully functional. percentComplete should reflect actual working code, not just file existence. If existing context has features, carry them forward and update their status based on the current diff.
+- For diagrams: generate 1-3 Mermaid.js diagrams that visualize the project's architecture and flows. Always include a system architecture diagram showing how the main modules connect. Add flow diagrams for key processes if relevant. Use valid Mermaid syntax — graph TD for architecture, sequenceDiagram for flows, etc. Keep diagrams concise (under 20 nodes). Use actual file and module names from the codebase.
 - Output ONLY the JSON block, no other text

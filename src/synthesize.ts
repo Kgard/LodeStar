@@ -138,12 +138,85 @@ async function truncateToTokenBudget(
   };
 }
 
+function fixJsonNewlines(text: string): string {
+  // Fix unescaped newlines inside JSON string values
+  // Walk through the string, tracking whether we're inside a JSON string
+  let result = "";
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      result += ch;
+      escaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+
+    if (inString && ch === "\n") {
+      result += "\\n";
+      continue;
+    }
+
+    if (inString && ch === "\r") {
+      continue;
+    }
+
+    result += ch;
+  }
+
+  return result;
+}
+
 function parseResponse(raw: string): LodestarContext {
-  const jsonMatch = raw.match(/```json\s*([\s\S]*?)```/);
-  if (!jsonMatch) {
+  // Extract JSON content — try fence first, then brace matching
+  let jsonText: string | null = null;
+
+  const fenceMatch = raw.match(/```json\s*\n([\s\S]*)```/);
+  if (fenceMatch) {
+    // Take everything between the first ```json and the LAST ```
+    const inner = fenceMatch[1];
+    const lastFence = inner.lastIndexOf("```");
+    jsonText = lastFence !== -1 ? inner.slice(0, lastFence) : inner;
+  }
+
+  if (!jsonText) {
+    const braceStart = raw.indexOf("{");
+    const braceEnd = raw.lastIndexOf("}");
+    if (braceStart !== -1 && braceEnd > braceStart) {
+      jsonText = raw.slice(braceStart, braceEnd + 1);
+    }
+  }
+
+  if (!jsonText) {
     throw new Error("Response did not contain a JSON block");
   }
-  return JSON.parse(jsonMatch[1]) as LodestarContext;
+
+  // Try parsing as-is first
+  try {
+    return JSON.parse(jsonText) as LodestarContext;
+  } catch {
+    // Fix unescaped newlines in string values and retry
+  }
+
+  try {
+    return JSON.parse(fixJsonNewlines(jsonText)) as LodestarContext;
+  } catch {
+    throw new Error("Response contained invalid JSON");
+  }
 }
 
 async function atomicWrite(
@@ -242,6 +315,8 @@ export async function synthesizeContext(
     context = parseResponse(raw);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.error("[lodestar] Raw LLM response (first 500 chars):", raw.slice(0, 500));
+    console.error("[lodestar] Raw LLM response (last 200 chars):", raw.slice(-200));
     return { success: false, path: filePath, summary: `Failed to parse LLM response: ${message}` };
   }
 
