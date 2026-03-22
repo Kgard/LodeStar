@@ -3,6 +3,7 @@
 // Lodestar CLI — lodestar init | synthesize | load
 
 import path from "node:path";
+import fs from "node:fs/promises";
 import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 
@@ -29,10 +30,24 @@ async function runInit(): Promise<void> {
   await init();
 }
 
+async function isFirstRun(projectRoot: string): Promise<boolean> {
+  try {
+    await fs.access(path.join(projectRoot, ".lodestar.md"));
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 async function runSynthesize(args: string[]): Promise<void> {
   const projectRoot = path.resolve(args[0] ?? process.cwd());
 
-  console.error(`Synthesizing session context for ${projectRoot} ...`);
+  if (await isFirstRun(projectRoot)) {
+    console.error(`First synthesis for ${projectRoot} — capturing current project state ...`);
+  } else {
+    console.error(`Synthesizing session context for ${projectRoot} ...`);
+  }
+
   const result = await synthesizeContext({ projectRoot });
 
   if (!result.success) {

@@ -7,6 +7,7 @@ import { select, input, confirm, checkbox } from "@inquirer/prompts";
 import open from "open";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { synthesizeContext } from "./synthesize.js";
 import {
   writeConfig,
   readConfig,
@@ -300,6 +301,42 @@ async function setupOllama(): Promise<{ model: string; host: string }> {
   return { model, host };
 }
 
+async function offerFirstSynthesize(): Promise<void> {
+  const wantsSynthesize = await confirm({
+    message: "Do you have a project you'd like to synthesize now?",
+    default: true,
+  });
+
+  if (!wantsSynthesize) {
+    return;
+  }
+
+  const projectPath = await input({
+    message: "Path to your project (or press Enter for current directory):",
+    default: process.cwd(),
+  });
+
+  const resolved = path.resolve(projectPath);
+
+  console.error(`\nSynthesizing ${resolved} ...`);
+  const result = await synthesizeContext({ projectRoot: resolved });
+
+  if (!result.success) {
+    console.error(`✗ ${result.summary}`);
+    console.error("You can try again later with: lodestar synthesize\n");
+    return;
+  }
+
+  console.error(`✓ ${result.summary}`);
+  console.error(`  Written to ${result.path}`);
+  if (result.warnings) {
+    for (const w of result.warnings) {
+      console.error(`  ⚠ ${w}`);
+    }
+  }
+  console.error("");
+}
+
 export async function runInit(): Promise<void> {
   console.error(BANNER);
 
@@ -358,6 +395,9 @@ export async function runInit(): Promise<void> {
 
   // Auto-configure coding tools
   await setupToolIntegration();
+
+  // Offer first synthesis on an active project
+  await offerFirstSynthesize();
 
   console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Lodestar is ready.
