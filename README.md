@@ -25,7 +25,15 @@ lodestar load
 ```
 Returns the structured context from your last session. Your AI assistant can read this to warm-start instead of starting cold.
 
-Your AI can also call these directly — Lodestar runs as an MCP server, so Claude Code, Cursor, and Windsurf can invoke `lodestar_synthesize` and `lodestar_load` as tools.
+Your AI can also call these directly — Lodestar runs as an MCP server, so Claude Code, Cursor, and Windsurf can invoke `lodestar_synthesize` and `lodestar_load` as tools. Just tell your AI:
+
+> "lodestar load"
+
+or
+
+> "lodestar synthesize"
+
+No path or arguments needed — it defaults to the current project.
 
 ---
 
@@ -133,19 +141,21 @@ The wizard will:
 1. **Ask which AI provider you use** — Anthropic (recommended), OpenAI, or Ollama
 2. **Walk you through API key setup** — opens your provider's console in the browser if you need a key
 3. **Validate your key** — makes a test API call to confirm it works
-4. **Auto-configure your coding tools** — detects Claude Desktop, Claude Code, Cursor, and Windsurf on your machine and adds Lodestar's MCP server entry to their config files
+4. **Auto-configure your coding tools** — detects Claude Desktop, Claude Code, Cursor, and Windsurf on your machine and adds Lodestar's MCP server entry to their config files automatically
+5. **Offer to synthesize your first project** — if you have an active project, Lodestar will run synthesis right away so you can see it in action
 
 That's it. No `.env` files to manage, no manual config editing. Your API key is stored in `~/.lodestar.config.json` — never in your project repo.
 
 ### Re-running setup
 
-If you need to change providers or update your API key:
-
 ```bash
 lodestar init
 ```
 
-It will detect the existing config and ask before overwriting.
+If you already have a config, Lodestar will detect it and give you two options:
+
+- **Keep current config** — skips API key setup, goes straight to tool integration and first-project synthesis
+- **Switch provider or update API key** — if you pick the same provider, your existing key is reused automatically; only asks for a new key if you're switching providers
 
 ---
 
@@ -153,7 +163,7 @@ It will detect the existing config and ask before overwriting.
 
 ### From the command line
 
-Lodestar works from any git project directory.
+Lodestar works from any git project directory. `[path]` is not required if you are in the project directory.
 
 ```bash
 # Navigate to your project
@@ -166,36 +176,41 @@ lodestar synthesize
 lodestar load
 ```
 
-You can also specify a path:
+You can also specify a path from anywhere:
 
 ```bash
 lodestar synthesize ~/my-project
 lodestar load ~/my-project
 ```
 
-`[path]` is not required if you are in the project directory.
-
-You can also add optional session notes:
-
-```bash
-# Notes aren't supported via CLI yet — use the MCP tool for this
-```
+`lodestar sync` is an alias for `lodestar synthesize`.
 
 ### From your AI coding tool
 
-If you ran `lodestar init` and selected your coding tools, the MCP server is already configured. Just tell your AI:
+If you ran `lodestar init` and selected your coding tools, the MCP server is already configured. Just tell your AI in natural language:
 
-> "Synthesize this session with Lodestar"
+**Starting a session:**
+> "lodestar load"
 
-or
+> "Load the lodestar context"
 
-> "Load the Lodestar context for this project"
+> "What did we work on last session?"
 
-Your AI will call the MCP tools directly:
+**Ending a session:**
+> "lodestar synthesize"
 
-- **`lodestar_synthesize`** — pass `projectRoot` (absolute path) and optional `sessionNotes`
-- **`lodestar_load`** — pass `projectRoot` (absolute path)
-- **`lodestar_diff`** — not yet implemented (Phase 1b)
+> "Synthesize this session with lodestar"
+
+> "Save the session context"
+
+No path or arguments needed — the MCP tools default to the current working directory. Your AI calls `lodestar_load` or `lodestar_synthesize` behind the scenes.
+
+**First time on a project?** Lodestar detects when there's no existing `.lodestar.md` and gives a friendlier message:
+
+```
+First synthesis for /Users/you/my-app — capturing current project state ...
+✓ Synthesized 8 decisions for my-app
+```
 
 ### Manual MCP configuration
 
@@ -300,10 +315,19 @@ Use Ollama. It runs locally, it's free, and Lodestar supports it out of the box.
 Lodestar is free. The AI API call costs ~$0.01–0.05 per synthesis using your own key. Ollama is completely free.
 
 **Does it work with [my AI coding tool]?**
-If your tool supports MCP servers via stdio transport, yes. Add the server entry to your tool's MCP config.
+If your tool supports MCP servers via stdio transport, yes. `lodestar init` auto-configures Claude Desktop, Claude Code, Cursor, and Windsurf. For other tools, add the MCP server entry manually.
 
 **What if my diff is huge?**
 Lodestar caps input at 6,000 tokens and truncates the diff with a warning. It prioritizes the most recent changes.
+
+**Do I need to pass a path every time?**
+No. If you're in your project directory, just run `lodestar synthesize` or `lodestar load` — no arguments needed. Same when talking to your AI: just say "lodestar load".
+
+**What happens the first time I run it on a project?**
+Lodestar detects there's no existing `.lodestar.md` and captures the current state of the project. The `lodestar init` wizard also offers to synthesize your first project right after setup.
+
+**What if I enter a wrong path during setup?**
+Lodestar will tell you the path doesn't exist and let you try again — it won't kick you out of the wizard.
 
 ---
 
