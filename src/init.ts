@@ -311,30 +311,50 @@ async function offerFirstSynthesize(): Promise<void> {
     return;
   }
 
-  const projectPath = await input({
-    message: "Path to your project (or press Enter for current directory):",
-    default: process.cwd(),
-  });
+  while (true) {
+    const projectPath = await input({
+      message: "Path to your project (or press Enter for current directory):",
+      default: process.cwd(),
+    });
 
-  const resolved = path.resolve(projectPath);
+    const resolved = path.resolve(projectPath);
 
-  console.error(`\nSynthesizing ${resolved} ...`);
-  const result = await synthesizeContext({ projectRoot: resolved });
+    // Check directory exists
+    try {
+      const stat = await fs.stat(resolved);
+      if (!stat.isDirectory()) {
+        console.error(`✗ ${resolved} is not a directory.\n`);
+        const retry = await confirm({ message: "Try a different path?", default: true });
+        if (!retry) return;
+        continue;
+      }
+    } catch {
+      console.error(`✗ ${resolved} does not exist.\n`);
+      const retry = await confirm({ message: "Try a different path?", default: true });
+      if (!retry) return;
+      continue;
+    }
 
-  if (!result.success) {
-    console.error(`✗ ${result.summary}`);
-    console.error("You can try again later with: lodestar synthesize\n");
+    console.error(`\nSynthesizing ${resolved} ...`);
+    const result = await synthesizeContext({ projectRoot: resolved });
+
+    if (!result.success) {
+      console.error(`✗ ${result.summary}\n`);
+      const retry = await confirm({ message: "Try a different project?", default: true });
+      if (!retry) return;
+      continue;
+    }
+
+    console.error(`✓ ${result.summary}`);
+    console.error(`  Written to ${result.path}`);
+    if (result.warnings) {
+      for (const w of result.warnings) {
+        console.error(`  ⚠ ${w}`);
+      }
+    }
+    console.error("");
     return;
   }
-
-  console.error(`✓ ${result.summary}`);
-  console.error(`  Written to ${result.path}`);
-  if (result.warnings) {
-    for (const w of result.warnings) {
-      console.error(`  ⚠ ${w}`);
-    }
-  }
-  console.error("");
 }
 
 export async function runInit(): Promise<void> {
