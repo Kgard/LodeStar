@@ -1,4 +1,6 @@
 node_modules/
 dist/
+bundle/
+bin/
 .env
 .lodestar.history/

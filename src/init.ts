@@ -93,10 +93,15 @@ async function detectInstalledTools(): Promise<CodingTool[]> {
 }
 
 function getLodestarServerEntry(): Record<string, unknown> {
-  const indexPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
-    "index.js"
-  );
+  // Resolve index.js relative to this file
+  // Works in both ESM (import.meta.url) and CJS (__dirname) contexts
+  let dir: string;
+  try {
+    dir = path.dirname(new URL(import.meta.url).pathname);
+  } catch {
+    dir = __dirname;
+  }
+  const indexPath = path.resolve(dir, "index.js");
   return {
     command: "node",
     args: [indexPath],

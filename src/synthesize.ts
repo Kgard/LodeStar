@@ -7,7 +7,8 @@ import { captureGitSnapshot, isGitError } from "./git.js";
 import { readConfig } from "./config.js";
 import { getProvider } from "./providers/index.js";
 import { rotateHistory } from "./history.js";
-import { contextToMarkdown, parseMarkdown, type LodestarContext } from "./schema.js";
+import { contextToMarkdown, type LodestarContext } from "./schema.js";
+import { loadPromptTemplate } from "./prompt.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const TOKEN_BUDGET = 6000;
@@ -22,14 +23,6 @@ export interface SynthesizeResult {
   path: string;
   summary: string;
   warnings?: string[];
-}
-
-async function loadPromptTemplate(): Promise<string> {
-  const promptPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
-    "../prompts/synthesize.md"
-  );
-  return fs.readFile(promptPath, "utf-8");
 }
 
 function buildInput(parts: {
