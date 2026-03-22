@@ -343,13 +343,34 @@ export async function runInit(): Promise<void> {
   // Check for existing config
   const existing = await readConfig();
   if (existing.config) {
-    const overwrite = await confirm({
-      message: `Existing config found (${existing.config.provider}). Overwrite?`,
-      default: false,
+    console.error(`Existing config found: ${existing.config.provider} (${existing.config.model})\n`);
+
+    const action = await select({
+      message: "What would you like to do?",
+      choices: [
+        { name: "Keep current config — just reconfigure coding tools", value: "keep" },
+        { name: "Switch provider or update API key", value: "reconfigure" },
+      ],
     });
-    if (!overwrite) {
-      console.error("Setup cancelled.");
-      process.exit(0);
+
+    if (action === "keep") {
+      console.error(`\n✓ Keeping existing config\n`);
+      await setupToolIntegration();
+      await offerFirstSynthesize();
+      console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lodestar is ready.
+
+At the end of any coding session:
+  lodestar synthesize
+
+At the start of any coding session:
+  lodestar load
+
+Or just tell your AI: "synthesize this session with lodestar"
+
+Sign up for Keelson updates: keelson.io
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      return;
     }
   }
 
@@ -364,22 +385,40 @@ export async function runInit(): Promise<void> {
 
   let config: LodestarConfig;
 
+  // Reuse existing API key if same provider selected
+  const reuseKey =
+    existing.config &&
+    existing.config.provider === provider &&
+    existing.config.apiKey;
+
   switch (provider) {
     case "anthropic": {
-      const apiKey = await getApiKey(
-        "an Anthropic",
-        "https://console.anthropic.com/settings/keys",
-        validateAnthropicKey
-      );
+      let apiKey: string;
+      if (reuseKey) {
+        console.error("\n✓ Reusing existing Anthropic API key\n");
+        apiKey = existing.config!.apiKey!;
+      } else {
+        apiKey = await getApiKey(
+          "an Anthropic",
+          "https://console.anthropic.com/settings/keys",
+          validateAnthropicKey
+        );
+      }
       config = { provider: "anthropic", model: "claude-sonnet-4-6", apiKey };
       break;
     }
     case "openai": {
-      const apiKey = await getApiKey(
-        "an OpenAI",
-        "https://platform.openai.com/api-keys",
-        validateOpenAIKey
-      );
+      let apiKey: string;
+      if (reuseKey) {
+        console.error("\n✓ Reusing existing OpenAI API key\n");
+        apiKey = existing.config!.apiKey!;
+      } else {
+        apiKey = await getApiKey(
+          "an OpenAI",
+          "https://platform.openai.com/api-keys",
+          validateOpenAIKey
+        );
+      }
       config = { provider: "openai", model: "gpt-4o", apiKey };
       break;
     }
