@@ -11,29 +11,15 @@ Lodestar synthesizes your coding session into a structured `.lodestar.md` file t
 
 ---
 
-## What it does
+## Three commands
 
-**At the end of a session:**
+```bash
+lodestar start       # Load context from your last session
+lodestar save        # Mid-session checkpoint
+lodestar end         # Done for the day — save and commit
 ```
-lodestar synthesize
-```
-Lodestar reads your git diff, analyzes what changed, and uses AI to extract the *decisions and rationale* — not just what changed, but *why*. It writes a `.lodestar.md` file in your project root.
 
-**At the start of a session:**
-```
-lodestar load
-```
-Returns the structured context from your last session. Your AI assistant can read this to warm-start instead of starting cold.
-
-Your AI can also call these directly — Lodestar runs as an MCP server, so Claude Code, Cursor, and Windsurf can invoke `lodestar_synthesize` and `lodestar_load` as tools. Just tell your AI:
-
-> "lodestar load"
-
-or
-
-> "lodestar synthesize"
-
-No path or arguments needed — it defaults to the current project.
+That's it. No paths needed if you're in your project directory. Works from the terminal or just tell your AI — "lodestar start", "lodestar save", "lodestar end".
 
 ---
 
@@ -45,7 +31,7 @@ Lodestar doesn't produce a git log summary. It produces a handoff note — the k
 # Lodestar Context
 
 > Project: my-app
-> Date: 2026-03-21
+> Date: 2026-03-22
 > Model: claude-sonnet-4-6
 
 ## Decisions
@@ -161,49 +147,55 @@ If you already have a config, Lodestar will detect it and give you two options:
 
 ## Usage
 
-### From the command line
-
-Lodestar works from any git project directory. `[path]` is not required if you are in the project directory.
+### The simple version
 
 ```bash
-# Navigate to your project
 cd ~/my-project
 
-# At the end of a session — synthesize what happened
-lodestar synthesize
-
-# At the start of a session — load previous context
-lodestar load
+lodestar start          # Beginning of session — what happened last time?
+# ... do your work ...
+lodestar save           # Mid-session — checkpoint your progress
+# ... keep working ...
+lodestar end            # End of session — save and commit
 ```
 
-You can also specify a path from anywhere:
+`[path]` is not required if you are in the project directory. You can also specify a path from anywhere:
 
 ```bash
-lodestar synthesize ~/my-project
-lodestar load ~/my-project
+lodestar start ~/my-project
+lodestar end ~/my-project
 ```
 
-`lodestar sync` is an alias for `lodestar synthesize`.
+### What each command does
+
+| Command | What happens |
+|---|---|
+| `lodestar start` | Reads `.lodestar.md` and returns your previous session's context — decisions, patterns, open questions, and where to pick up |
+| `lodestar save` | Runs synthesis (analyzes git diffs + commits since last save) and writes `.lodestar.md` — does NOT commit |
+| `lodestar end` | Runs synthesis, then commits `.lodestar.md` to git — clean session close |
 
 ### From your AI coding tool
 
 If you ran `lodestar init` and selected your coding tools, the MCP server is already configured. Just tell your AI in natural language:
 
 **Starting a session:**
-> "lodestar load"
+> "lodestar start"
 
 > "Load the lodestar context"
 
 > "What did we work on last session?"
 
+**Mid-session checkpoint:**
+> "lodestar save"
+
+> "Save a checkpoint with lodestar"
+
 **Ending a session:**
-> "lodestar synthesize"
+> "lodestar end"
 
-> "Synthesize this session with lodestar"
+> "End this session with lodestar"
 
-> "Save the session context"
-
-No path or arguments needed — the MCP tools default to the current working directory. Your AI calls `lodestar_load` or `lodestar_synthesize` behind the scenes.
+No path or arguments needed — the MCP tools default to the current working directory.
 
 **First time on a project?** Lodestar detects when there's no existing `.lodestar.md` and gives a friendlier message:
 
@@ -211,6 +203,16 @@ No path or arguments needed — the MCP tools default to the current working dir
 First synthesis for /Users/you/my-app — capturing current project state ...
 ✓ Synthesized 8 decisions for my-app
 ```
+
+### Power-user aliases
+
+The old command names still work:
+
+| Alias | Same as |
+|---|---|
+| `lodestar load` | `lodestar start` |
+| `lodestar synthesize` | `lodestar save` |
+| `lodestar sync` | `lodestar save` |
 
 ### Manual MCP configuration
 
@@ -240,16 +242,21 @@ Replace `/path/to/LodeStar` with the actual path where you cloned the repo.
 
 ## How it works
 
-### Synthesize
+### Synthesis (save / end)
 
-1. Captures `git diff HEAD` and `git status` from your project
-2. Detects `package.json` changes (new/removed dependencies)
-3. Sends the diff + metadata to your configured AI provider with a carefully crafted synthesis prompt
-4. The AI extracts decisions, patterns, dependencies, rejected approaches, and open questions
-5. If a `.lodestar.md` already exists, it's moved to `.lodestar.history/` before being replaced
-6. The new `.lodestar.md` is written atomically to your project root
+1. Captures **uncommitted changes** (`git diff HEAD`) from your project
+2. Captures **committed changes since last synthesis** — finds the commit that last touched `.lodestar.md` and diffs everything since
+3. Captures the **commit log** since last synthesis for additional context
+4. Detects `package.json` changes (new/removed dependencies)
+5. Sends everything to your configured AI provider with a carefully crafted synthesis prompt
+6. The AI extracts decisions, patterns, dependencies, rejected approaches, and open questions
+7. If a `.lodestar.md` already exists, it's moved to `.lodestar.history/` before being replaced
+8. The new `.lodestar.md` is written atomically to your project root
+9. (`lodestar end` only) Commits `.lodestar.md` to git
 
-### Load
+This means synthesis works whether you commit frequently during a session or save everything for the end. Both committed and uncommitted work is captured.
+
+### Load (start)
 
 1. Reads `.lodestar.md` from your project root
 2. Parses it back into structured context
@@ -257,20 +264,20 @@ Replace `/path/to/LodeStar` with the actual path where you cloned the repo.
 
 ### History
 
-Every time you synthesize, the previous `.lodestar.md` is saved to `.lodestar.history/` with a timestamp:
+Every time you save or end, the previous `.lodestar.md` is backed up to `.lodestar.history/` with a timestamp:
 
 ```
 .lodestar.history/
-  2026-03-21-14-30.md
-  2026-03-20-09-15.md
-  2026-03-19-16-45.md
+  2026-03-22-14-30.md
+  2026-03-21-09-15.md
+  2026-03-20-16-45.md
 ```
 
-Only the last 3 files are kept. Older files are pruned automatically. The history directory is gitignored — it's for local recovery only. The current `.lodestar.md` is committed to git.
+Only the last 3 files are kept. Older files are pruned automatically. The history directory is gitignored — it's for local recovery only. The current `.lodestar.md` is committed to git (via `lodestar end`).
 
 ### Token budget
 
-The combined input to the AI is capped at 6,000 tokens. If your git diff is too large, Lodestar truncates it (most recent changes first) and surfaces a warning. It never silently drops context.
+The combined input to the AI is capped at 6,000 tokens. If your diffs are too large, Lodestar truncates them and surfaces a warning. It never silently drops context. The budget is split 60/40 between committed and uncommitted diffs.
 
 ---
 
@@ -306,7 +313,10 @@ Lodestar itself is installed separately. It doesn't add any code to your project
 No. Install it once, run it against any git project.
 
 **Does `.lodestar.md` go in `.gitignore`?**
-No — commit it. Version control of your decisions is a feature. The `.lodestar.history/` directory is gitignored automatically.
+No — commit it. Version control of your decisions is a feature. `lodestar end` commits it for you. The `.lodestar.history/` directory is gitignored automatically.
+
+**What's the difference between `save` and `end`?**
+`save` writes `.lodestar.md` but doesn't commit. Use it for mid-session checkpoints. `end` writes and commits — use it when you're done for the day.
 
 **What if I don't have an API key?**
 Use Ollama. It runs locally, it's free, and Lodestar supports it out of the box. Run `lodestar init` and select Ollama.
@@ -318,13 +328,16 @@ Lodestar is free. The AI API call costs ~$0.01–0.05 per synthesis using your o
 If your tool supports MCP servers via stdio transport, yes. `lodestar init` auto-configures Claude Desktop, Claude Code, Cursor, and Windsurf. For other tools, add the MCP server entry manually.
 
 **What if my diff is huge?**
-Lodestar caps input at 6,000 tokens and truncates the diff with a warning. It prioritizes the most recent changes.
+Lodestar caps input at 6,000 tokens and truncates the diffs with a warning.
 
 **Do I need to pass a path every time?**
-No. If you're in your project directory, just run `lodestar synthesize` or `lodestar load` — no arguments needed. Same when talking to your AI: just say "lodestar load".
+No. If you're in your project directory, just run `lodestar start` / `lodestar save` / `lodestar end` — no arguments needed. Same when talking to your AI.
 
 **What happens the first time I run it on a project?**
 Lodestar detects there's no existing `.lodestar.md` and captures the current state of the project. The `lodestar init` wizard also offers to synthesize your first project right after setup.
+
+**What if I commit a lot during my session?**
+Lodestar captures both uncommitted changes AND committed changes since the last synthesis. It finds the commit that last touched `.lodestar.md` and diffs everything since then. Your full session is captured regardless of commit frequency.
 
 **What if I enter a wrong path during setup?**
 Lodestar will tell you the path doesn't exist and let you try again — it won't kick you out of the wizard.
@@ -333,7 +346,7 @@ Lodestar will tell you the path doesn't exist and let you try again — it won't
 
 ## Roadmap
 
-- **Phase 1a** (current) — `lodestar synthesize` + `lodestar load`
+- **Phase 1a** (current) — `lodestar start` / `save` / `end`
 - **Phase 1b** — `lodestar diff` — drift detection against a reference brief
 - **Phase 2** — Automatic session-end synthesis (no manual command needed)
 - **Phase 3** — Cross-project pattern analysis

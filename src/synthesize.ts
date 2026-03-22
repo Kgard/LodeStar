@@ -34,6 +34,8 @@ async function loadPromptTemplate(): Promise<string> {
 
 function buildInput(parts: {
   gitDiff: string;
+  committedDiff: string;
+  commitLog: string;
   gitStatus: string;
   packageChanges: string | null;
   sessionNotes: string | null;
@@ -43,9 +45,19 @@ function buildInput(parts: {
   const lines: string[] = [];
   lines.push(`**Project:** ${parts.projectName}`);
   lines.push("");
-  lines.push("**Git diff (HEAD):**");
+  lines.push("**Uncommitted changes (git diff HEAD):**");
   lines.push("```");
   lines.push(parts.gitDiff);
+  lines.push("```");
+  lines.push("");
+  lines.push("**Committed changes since last synthesis:**");
+  lines.push("```");
+  lines.push(parts.committedDiff);
+  lines.push("```");
+  lines.push("");
+  lines.push("**Commit log since last synthesis:**");
+  lines.push("```");
+  lines.push(parts.commitLog);
   lines.push("```");
   lines.push("");
   lines.push("**Git status:**");
@@ -66,29 +78,17 @@ function buildInput(parts: {
   return lines.join("\n");
 }
 
-async function truncateToTokenBudget(
+async function truncateDiff(
   provider: ReturnType<typeof getProvider>,
-  gitDiff: string,
-  gitStatus: string,
-  packageChanges: string | null,
-  sessionNotes: string | null,
-  existingContext: string | null
-): Promise<{ truncatedDiff: string; wasTruncated: boolean }> {
-  const overhead = [gitStatus, packageChanges ?? "", sessionNotes ?? "", existingContext ?? ""].join("\n");
-  const overheadTokens = await provider.countTokens(overhead);
-  const diffBudget = TOKEN_BUDGET - overheadTokens;
-
-  if (diffBudget <= 0) {
-    return { truncatedDiff: "(diff omitted — other inputs exceed token budget)", wasTruncated: true };
+  diff: string,
+  budget: number
+): Promise<{ text: string; wasTruncated: boolean }> {
+  const tokens = await provider.countTokens(diff);
+  if (tokens <= budget) {
+    return { text: diff, wasTruncated: false };
   }
 
-  const diffTokens = await provider.countTokens(gitDiff);
-  if (diffTokens <= diffBudget) {
-    return { truncatedDiff: gitDiff, wasTruncated: false };
-  }
-
-  // Truncate by taking progressively fewer lines until under budget
-  const lines = gitDiff.split("\n");
+  const lines = diff.split("\n");
   let lo = 0;
   let hi = lines.length;
   let best = 0;
@@ -96,8 +96,8 @@ async function truncateToTokenBudget(
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
     const candidate = lines.slice(0, mid).join("\n");
-    const tokens = await provider.countTokens(candidate);
-    if (tokens <= diffBudget) {
+    const t = await provider.countTokens(candidate);
+    if (t <= budget) {
       best = mid;
       lo = mid + 1;
     } else {
@@ -106,7 +106,43 @@ async function truncateToTokenBudget(
   }
 
   const truncated = lines.slice(0, best).join("\n");
-  return { truncatedDiff: truncated + "\n\n(diff truncated — exceeded token budget)", wasTruncated: true };
+  return { text: truncated + "\n\n(truncated — exceeded token budget)", wasTruncated: true };
+}
+
+async function truncateToTokenBudget(
+  provider: ReturnType<typeof getProvider>,
+  gitDiff: string,
+  committedDiff: string,
+  commitLog: string,
+  gitStatus: string,
+  packageChanges: string | null,
+  sessionNotes: string | null,
+  existingContext: string | null
+): Promise<{ truncatedDiff: string; truncatedCommittedDiff: string; wasTruncated: boolean }> {
+  const overhead = [commitLog, gitStatus, packageChanges ?? "", sessionNotes ?? "", existingContext ?? ""].join("\n");
+  const overheadTokens = await provider.countTokens(overhead);
+  const totalBudget = TOKEN_BUDGET - overheadTokens;
+
+  if (totalBudget <= 0) {
+    return {
+      truncatedDiff: "(diff omitted — other inputs exceed token budget)",
+      truncatedCommittedDiff: "(diff omitted)",
+      wasTruncated: true,
+    };
+  }
+
+  // Split budget: 60% to committed diff (session history), 40% to uncommitted
+  const committedBudget = Math.floor(totalBudget * 0.6);
+  const uncommittedBudget = totalBudget - committedBudget;
+
+  const committed = await truncateDiff(provider, committedDiff, committedBudget);
+  const uncommitted = await truncateDiff(provider, gitDiff, uncommittedBudget);
+
+  return {
+    truncatedDiff: uncommitted.text,
+    truncatedCommittedDiff: committed.text,
+    wasTruncated: committed.wasTruncated || uncommitted.wasTruncated,
+  };
 }
 
 function parseResponse(raw: string): LodestarContext {
@@ -163,10 +199,12 @@ export async function synthesizeContext(
     // No existing context
   }
 
-  // Truncate diff to token budget
-  const { truncatedDiff, wasTruncated } = await truncateToTokenBudget(
+  // Truncate diffs to token budget
+  const { truncatedDiff, truncatedCommittedDiff, wasTruncated } = await truncateToTokenBudget(
     provider,
     gitResult.diff,
+    gitResult.committedDiff,
+    gitResult.commitLog,
     gitResult.status,
     gitResult.packageChanges,
     input.sessionNotes ?? null,
@@ -187,6 +225,8 @@ export async function synthesizeContext(
 
   const inputText = buildInput({
     gitDiff: truncatedDiff,
+    committedDiff: truncatedCommittedDiff,
+    commitLog: gitResult.commitLog,
     gitStatus: gitResult.status,
     packageChanges: gitResult.packageChanges,
     sessionNotes: input.sessionNotes ?? null,

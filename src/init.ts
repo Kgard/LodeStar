@@ -380,13 +380,11 @@ export async function runInit(): Promise<void> {
       console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Lodestar is ready.
 
-At the end of any coding session:
-  lodestar synthesize
+  lodestar start       Load context from your last session
+  lodestar save        Save a mid-session checkpoint
+  lodestar end         Done for the day — save and commit
 
-At the start of any coding session:
-  lodestar load
-
-Or just tell your AI: "synthesize this session with lodestar"
+Or just tell your AI: "lodestar start" / "lodestar end"
 
 Sign up for Keelson updates: keelson.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
@@ -461,13 +459,11 @@ Sign up for Keelson updates: keelson.io
   console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Lodestar is ready.
 
-At the end of any coding session:
-  lodestar synthesize
+  lodestar start       Load context from your last session
+  lodestar save        Save a mid-session checkpoint
+  lodestar end         Done for the day — save and commit
 
-At the start of any coding session:
-  lodestar load
-
-Or just tell your AI: "synthesize this session with lodestar"
+Or just tell your AI: "lodestar start" / "lodestar end"
 
 Sign up for Keelson updates: keelson.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);

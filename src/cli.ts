@@ -1,31 +1,34 @@
 #!/usr/bin/env node
 
-// Lodestar CLI — lodestar init | synthesize | load
+// Lodestar CLI — lodestar start | save | end | init
 
 import path from "node:path";
 import fs from "node:fs/promises";
+import { simpleGit } from "simple-git";
 import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 
 const USAGE = `
 Lodestar — Keelson Module 00
+"Every session remembers where you left off."
 
-Usage:
-  lodestar init                    Set up provider and API key
-  lodestar synthesize [path]       Save session context to .lodestar.md
-  lodestar load [path]             Load session context from .lodestar.md
+Commands:
+  lodestar start [path]            Load context from your last session
+  lodestar save [path]             Save a mid-session checkpoint
+  lodestar end [path]              End session — synthesize + commit
+
+  lodestar init                    First-time setup (provider + API key)
   lodestar help                    Show this message
 
   [path] is not required if you are in the project directory.
 
 Examples:
-  lodestar synthesize              Synthesize current directory
-  lodestar synthesize ~/my-project Synthesize a specific project
-  lodestar load                    Load context for current directory
+  lodestar start                   Start coding — load previous context
+  lodestar save                    Quick checkpoint mid-session
+  lodestar end                     Done for the day — save and commit
 `;
 
 async function runInit(): Promise<void> {
-  // Dynamic import to avoid loading heavy deps (inquirer, open, SDKs) for other commands
   const { runInit: init } = await import("./init.js");
   await init();
 }
@@ -39,32 +42,7 @@ async function isFirstRun(projectRoot: string): Promise<boolean> {
   }
 }
 
-async function runSynthesize(args: string[]): Promise<void> {
-  const projectRoot = path.resolve(args[0] ?? process.cwd());
-
-  if (await isFirstRun(projectRoot)) {
-    console.error(`First synthesis for ${projectRoot} — capturing current project state ...`);
-  } else {
-    console.error(`Synthesizing session context for ${projectRoot} ...`);
-  }
-
-  const result = await synthesizeContext({ projectRoot });
-
-  if (!result.success) {
-    console.error(`✗ ${result.summary}`);
-    process.exit(1);
-  }
-
-  console.error(`✓ ${result.summary}`);
-  console.error(`  Written to ${result.path}`);
-  if (result.warnings) {
-    for (const w of result.warnings) {
-      console.error(`  ⚠ ${w}`);
-    }
-  }
-}
-
-async function runLoad(args: string[]): Promise<void> {
+async function runStart(args: string[]): Promise<void> {
   const projectRoot = path.resolve(args[0] ?? process.cwd());
 
   console.error(`Loading session context for ${projectRoot} ...`);
@@ -87,8 +65,66 @@ async function runLoad(args: string[]): Promise<void> {
     }
   }
 
-  // Print the context to stdout so it can be piped
   console.log(JSON.stringify(result.context, null, 2));
+}
+
+async function runSave(args: string[]): Promise<boolean> {
+  const projectRoot = path.resolve(args[0] ?? process.cwd());
+
+  if (await isFirstRun(projectRoot)) {
+    console.error(`First synthesis for ${projectRoot} — capturing current project state ...`);
+  } else {
+    console.error(`Saving session checkpoint for ${projectRoot} ...`);
+  }
+
+  const result = await synthesizeContext({ projectRoot });
+
+  if (!result.success) {
+    console.error(`✗ ${result.summary}`);
+    return false;
+  }
+
+  console.error(`✓ ${result.summary}`);
+  console.error(`  Written to ${result.path}`);
+  if (result.warnings) {
+    for (const w of result.warnings) {
+      console.error(`  ⚠ ${w}`);
+    }
+  }
+  return true;
+}
+
+async function runEnd(args: string[]): Promise<void> {
+  const projectRoot = path.resolve(args[0] ?? process.cwd());
+
+  // Step 1: Synthesize
+  const success = await runSave(args);
+  if (!success) {
+    process.exit(1);
+  }
+
+  // Step 2: Commit .lodestar.md
+  const git = simpleGit(projectRoot);
+
+  try {
+    await git.add(".lodestar.md");
+    await git.commit("chore: update session context via lodestar end");
+    console.error(`\n✓ Committed .lodestar.md`);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("nothing to commit") || message.includes("no changes added")) {
+      console.error(`\n✓ .lodestar.md already up to date — nothing to commit`);
+    } else {
+      console.error(`\n⚠ Could not commit .lodestar.md: ${message}`);
+      console.error(`  You can commit it manually: git add .lodestar.md && git commit -m "update session context"`);
+    }
+  }
+
+  console.error(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Session ended. Context saved for next time.
+
+To resume: lodestar start
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 }
 
 async function main(): Promise<void> {
@@ -98,12 +134,19 @@ async function main(): Promise<void> {
     case "init":
       await runInit();
       break;
+    case "start":
+    case "load":
+      await runStart(args);
+      break;
+    case "save":
     case "synthesize":
     case "sync":
-      await runSynthesize(args);
+      if (!(await runSave(args))) {
+        process.exit(1);
+      }
       break;
-    case "load":
-      await runLoad(args);
+    case "end":
+      await runEnd(args);
       break;
     case "help":
     case "--help":

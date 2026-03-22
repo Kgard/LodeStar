@@ -10,11 +10,27 @@ Your job is NOT to summarize the diff. Your job is to extract:
 
 ## Input
 
+You will receive two types of diffs:
+1. **Uncommitted changes** — work in progress that hasn't been committed yet
+2. **Committed changes since last synthesis** — everything committed since Lodestar last ran, including work across multiple commits
+
+Both are equally important. The committed diff captures the full session's work even if the developer committed frequently. The uncommitted diff captures work still in flight.
+
 **Project:** {{project_name}}
 
-**Git diff (HEAD):**
+**Uncommitted changes (git diff HEAD):**
 ```
 {{git_diff}}
+```
+
+**Committed changes since last synthesis:**
+```
+{{committed_diff}}
+```
+
+**Commit log since last synthesis:**
+```
+{{commit_log}}
 ```
 
 **Git status:**
