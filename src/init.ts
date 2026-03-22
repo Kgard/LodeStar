@@ -1,0 +1,375 @@
+// lodestar init CLI wizard
+
+import path from "node:path";
+import os from "node:os";
+import fs from "node:fs/promises";
+import { select, input, confirm, checkbox } from "@inquirer/prompts";
+import open from "open";
+import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import {
+  writeConfig,
+  readConfig,
+  getConfigPath,
+  type LodestarConfig,
+  type ProviderName,
+} from "./config.js";
+
+const BANNER = `
+╔═══════════════════════════════════════════╗
+║  Lodestar — Keelson Module 00             ║
+║  First-run setup                          ║
+╚═══════════════════════════════════════════╝
+`;
+
+interface CodingTool {
+  name: string;
+  configPath: string;
+  configKey: string;
+}
+
+function getCodingTools(): CodingTool[] {
+  const home = os.homedir();
+  const platform = process.platform;
+
+  const tools: CodingTool[] = [];
+
+  // Claude Desktop
+  if (platform === "darwin") {
+    tools.push({
+      name: "Claude Desktop",
+      configPath: path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+      configKey: "mcpServers",
+    });
+  } else if (platform === "win32") {
+    tools.push({
+      name: "Claude Desktop",
+      configPath: path.join(home, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),
+      configKey: "mcpServers",
+    });
+  }
+
+  // Claude Code
+  tools.push({
+    name: "Claude Code",
+    configPath: path.join(home, ".claude", "mcp.json"),
+    configKey: "mcpServers",
+  });
+
+  // Cursor (global)
+  tools.push({
+    name: "Cursor (global)",
+    configPath: path.join(home, ".cursor", "mcp.json"),
+    configKey: "mcpServers",
+  });
+
+  // Windsurf
+  tools.push({
+    name: "Windsurf",
+    configPath: path.join(home, ".codeium", "windsurf", "mcp_config.json"),
+    configKey: "mcpServers",
+  });
+
+  return tools;
+}
+
+async function detectInstalledTools(): Promise<CodingTool[]> {
+  const tools = getCodingTools();
+  const installed: CodingTool[] = [];
+
+  for (const tool of tools) {
+    try {
+      // Check if the config file or its parent directory exists
+      const dir = path.dirname(tool.configPath);
+      await fs.access(dir);
+      installed.push(tool);
+    } catch {
+      // Tool not installed
+    }
+  }
+
+  return installed;
+}
+
+function getLodestarServerEntry(): Record<string, unknown> {
+  const indexPath = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "index.js"
+  );
+  return {
+    command: "node",
+    args: [indexPath],
+  };
+}
+
+async function addToToolConfig(tool: CodingTool): Promise<{ success: boolean; message: string }> {
+  const entry = getLodestarServerEntry();
+
+  let existing: Record<string, unknown> = {};
+  try {
+    const raw = await fs.readFile(tool.configPath, "utf-8");
+    existing = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    // File doesn't exist or is invalid — start fresh
+  }
+
+  const servers = (existing[tool.configKey] ?? {}) as Record<string, unknown>;
+
+  if (servers["lodestar"]) {
+    servers["lodestar"] = entry;
+    existing[tool.configKey] = servers;
+    await fs.mkdir(path.dirname(tool.configPath), { recursive: true });
+    await fs.writeFile(tool.configPath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
+    return { success: true, message: `Updated existing Lodestar entry in ${tool.name}` };
+  }
+
+  servers["lodestar"] = entry;
+  existing[tool.configKey] = servers;
+  await fs.mkdir(path.dirname(tool.configPath), { recursive: true });
+  await fs.writeFile(tool.configPath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
+  return { success: true, message: `Added Lodestar to ${tool.name}` };
+}
+
+async function setupToolIntegration(): Promise<void> {
+  const installed = await detectInstalledTools();
+
+  if (installed.length === 0) {
+    console.error("\nNo supported coding tools detected. You can manually add Lodestar later.");
+    console.error(`Server path: ${getLodestarServerEntry().args}\n`);
+    return;
+  }
+
+  const selected = await checkbox({
+    message: "Which coding tools should Lodestar connect to?",
+    choices: installed.map((tool) => ({
+      name: tool.name,
+      value: tool,
+      checked: true,
+    })),
+  });
+
+  if (selected.length === 0) {
+    console.error("\nSkipped tool integration. You can add Lodestar manually later.\n");
+    return;
+  }
+
+  console.error("");
+  for (const tool of selected) {
+    try {
+      const result = await addToToolConfig(tool);
+      console.error(`✓ ${result.message}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error(`✗ Failed to configure ${tool.name}: ${message}`);
+    }
+  }
+  console.error("");
+}
+
+async function validateAnthropicKey(apiKey: string): Promise<boolean> {
+  try {
+    const client = new Anthropic({ apiKey });
+    await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    return true;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("authentication") || message.includes("401")) {
+      return false;
+    }
+    return true;
+  }
+}
+
+async function validateOpenAIKey(apiKey: string): Promise<boolean> {
+  try {
+    const client = new OpenAI({ apiKey });
+    await client.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    return true;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("Incorrect API key") || message.includes("401")) {
+      return false;
+    }
+    return true;
+  }
+}
+
+async function validateOllama(host: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${host}/api/tags`);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function getApiKey(
+  providerLabel: string,
+  consoleUrl: string,
+  validateFn: (key: string) => Promise<boolean>
+): Promise<string> {
+  const hasKey = await select({
+    message: `Do you have ${providerLabel} API key?`,
+    choices: [
+      { name: "Yes — I'll paste it now", value: "yes" },
+      { name: `No — open the ${providerLabel} console for me`, value: "no" },
+    ],
+  });
+
+  if (hasKey === "no") {
+    console.error(`\nOpening ${consoleUrl} ...`);
+    await open(consoleUrl);
+    console.error("Once you've created a key, paste it below.\n");
+  }
+
+  while (true) {
+    const apiKey = await input({
+      message: "Paste your API key:",
+    });
+
+    if (!apiKey.trim()) {
+      console.error("Key cannot be empty. Try again.");
+      continue;
+    }
+
+    console.error("Validating key...");
+    const valid = await validateFn(apiKey.trim());
+
+    if (valid) {
+      console.error("✓ Key validated\n");
+      return apiKey.trim();
+    }
+
+    console.error("✗ Key validation failed. Please check and try again.\n");
+  }
+}
+
+async function setupOllama(): Promise<{ model: string; host: string }> {
+  console.error("\nOllama runs locally — no API key needed.\n");
+
+  const installed = await select({
+    message: "Is Ollama already installed?",
+    choices: [
+      { name: "Yes — it's running on localhost:11434", value: "yes" },
+      { name: "No — open the Ollama install page for me", value: "no" },
+    ],
+  });
+
+  let host = "http://localhost:11434";
+
+  if (installed === "no") {
+    console.error("\nOpening https://ollama.ai/download ...");
+    await open("https://ollama.ai/download");
+    console.error("Once installed, run: ollama pull llama3.2\n");
+    await input({ message: "Press Enter to continue..." });
+  }
+
+  console.error("Checking Ollama connection...");
+  const valid = await validateOllama(host);
+
+  if (!valid) {
+    console.error("✗ Could not connect to Ollama at " + host);
+    host = await input({
+      message: "Enter your Ollama host (or press Enter for default):",
+      default: host,
+    });
+
+    const retry = await validateOllama(host);
+    if (!retry) {
+      console.error("✗ Still cannot connect. Saving config anyway — make sure Ollama is running before using Lodestar.\n");
+    } else {
+      console.error("✓ Connected\n");
+    }
+  } else {
+    console.error("✓ Connected\n");
+  }
+
+  const model = await input({
+    message: "Which model? (default: llama3.2)",
+    default: "llama3.2",
+  });
+
+  return { model, host };
+}
+
+export async function runInit(): Promise<void> {
+  console.error(BANNER);
+
+  // Check for existing config
+  const existing = await readConfig();
+  if (existing.config) {
+    const overwrite = await confirm({
+      message: `Existing config found (${existing.config.provider}). Overwrite?`,
+      default: false,
+    });
+    if (!overwrite) {
+      console.error("Setup cancelled.");
+      process.exit(0);
+    }
+  }
+
+  const provider = await select<ProviderName>({
+    message: "Which AI provider do you use for coding?",
+    choices: [
+      { name: "Anthropic (Claude) — recommended", value: "anthropic" },
+      { name: "OpenAI (GPT-4o, o3)", value: "openai" },
+      { name: "Ollama (local — no API key needed)", value: "ollama" },
+    ],
+  });
+
+  let config: LodestarConfig;
+
+  switch (provider) {
+    case "anthropic": {
+      const apiKey = await getApiKey(
+        "an Anthropic",
+        "https://console.anthropic.com/settings/keys",
+        validateAnthropicKey
+      );
+      config = { provider: "anthropic", model: "claude-sonnet-4-6", apiKey };
+      break;
+    }
+    case "openai": {
+      const apiKey = await getApiKey(
+        "an OpenAI",
+        "https://platform.openai.com/api-keys",
+        validateOpenAIKey
+      );
+      config = { provider: "openai", model: "gpt-4o", apiKey };
+      break;
+    }
+    case "ollama": {
+      const { model, host } = await setupOllama();
+      config = { provider: "ollama", model, ollamaHost: host };
+      break;
+    }
+  }
+
+  await writeConfig(config);
+  console.error(`✓ Config saved to ${getConfigPath()}\n`);
+
+  // Auto-configure coding tools
+  await setupToolIntegration();
+
+  console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lodestar is ready.
+
+At the end of any coding session:
+  lodestar synthesize
+
+At the start of any coding session:
+  lodestar load
+
+Or just tell your AI: "synthesize this session with lodestar"
+
+Sign up for Keelson updates: keelson.io
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+}
