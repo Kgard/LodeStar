@@ -20,35 +20,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "lodestar_synthesize",
       description:
-        "Synthesize the current session into a .lodestar.md context file. Captures git diffs, decisions, patterns, and rejected approaches.",
+        "Synthesize the current coding session into a .lodestar.md context file. Captures decisions, patterns, rejected approaches, and open questions from git diffs. Call this at the end of a session. projectRoot defaults to the current working directory if not provided.",
       inputSchema: {
         type: "object" as const,
         properties: {
           projectRoot: {
             type: "string",
-            description: "Absolute path to the project directory",
+            description: "Absolute path to the project directory. Defaults to current working directory if omitted.",
           },
           sessionNotes: {
             type: "string",
-            description: "Optional freeform notes from the developer",
+            description: "Optional freeform notes from the developer about the session",
           },
         },
-        required: ["projectRoot"],
       },
     },
     {
       name: "lodestar_load",
       description:
-        "Load the .lodestar.md context file for a project. Returns structured session context for warm-starting a new session.",
+        "Load session context from .lodestar.md for this project. Returns decisions, patterns, open questions, and next-session guidance from the previous session. Call this at the start of a session to warm-start. projectRoot defaults to the current working directory if not provided.",
       inputSchema: {
         type: "object" as const,
         properties: {
           projectRoot: {
             type: "string",
-            description: "Absolute path to the project directory",
+            description: "Absolute path to the project directory. Defaults to current working directory if omitted.",
           },
         },
-        required: ["projectRoot"],
       },
     },
     {
@@ -66,7 +64,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             description: "Path to reference document for comparison",
           },
         },
-        required: ["projectRoot"],
       },
     },
   ],
@@ -77,16 +74,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (name) {
     case "lodestar_synthesize": {
-      const projectRoot = args?.projectRoot as string;
+      const projectRoot = (args?.projectRoot as string) || process.cwd();
       const sessionNotes = args?.sessionNotes as string | undefined;
-
-      if (!projectRoot) {
-        return {
-          content: [
-            { type: "text", text: JSON.stringify({ success: false, error: "projectRoot is required" }) },
-          ],
-        };
-      }
 
       const result = await synthesizeContext({ projectRoot, sessionNotes });
       return {
@@ -95,15 +84,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case "lodestar_load": {
-      const projectRoot = args?.projectRoot as string;
-
-      if (!projectRoot) {
-        return {
-          content: [
-            { type: "text", text: JSON.stringify({ success: false, error: "projectRoot is required" }) },
-          ],
-        };
-      }
+      const projectRoot = (args?.projectRoot as string) || process.cwd();
 
       const result = await load(projectRoot);
       return {
