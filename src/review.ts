@@ -10,6 +10,7 @@ import { renderReaderHTML } from "./reader/template.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const HISTORY_DIR = ".lodestar.history";
+const BRIEF_HTML = "brief.html";
 const PRD_FILENAMES = ["CLAUDE.md", "lodestar.md", "PRD.md", "BRIEF.md", "README.md"];
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const PREFERRED_PORT = 7357;
@@ -49,6 +50,14 @@ async function readPrd(projectRoot: string): Promise<{ filename: string; content
   return null;
 }
 
+async function readBriefHtml(projectRoot: string): Promise<string | null> {
+  try {
+    return await fs.readFile(path.join(projectRoot, BRIEF_HTML), "utf-8");
+  } catch {
+    return null;
+  }
+}
+
 async function tryPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const test = http.createServer();
@@ -70,13 +79,14 @@ export async function runReview(options: {
     ? await readLatestHistory(resolved)
     : null;
   const prd = await readPrd(resolved);
+  const briefHtml = await readBriefHtml(resolved);
 
-  const html = renderReaderHTML(context, historyContext, prd);
+  const html = renderReaderHTML(context, historyContext, prd, briefHtml);
 
   // Serve via HTTP — required for Mermaid CDN to load (file:// blocks network requests)
   let idleTimer: ReturnType<typeof setTimeout>;
 
-  const server = http.createServer((_req, res) => {
+  const server = http.createServer((req, res) => {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       console.error("Lodestar reader: idle timeout, shutting down.");
@@ -85,7 +95,12 @@ export async function runReview(options: {
     }, IDLE_TIMEOUT_MS);
 
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(html);
+
+    if (req.url === "/brief" && briefHtml) {
+      res.end(briefHtml);
+    } else {
+      res.end(html);
+    }
   });
 
   const port = (await tryPort(PREFERRED_PORT)) ? PREFERRED_PORT : 0;

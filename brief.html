@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lodestar — Project Brief v0.2 · Keelson</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy:       #1B2C4A;
+    --navy-deep:  #0D1B30;
+    --navy-mid:   #243855;
+    --teal:       #1A6B72;
+    --teal-light: #2A8A93;
+    --teal-faint: #E0F4F5;
+    --brass:      #C8A84B;
+    --brass-pale: #F5EDD6;
+    --slate:      #334155;
+    --muted:      #64748B;
+    --ghost:      #94A3B8;
+    --bg:         #F7F6F2;
+    --surface:    #FFFFFF;
+    --border:     #DDD8CC;
+    --ok:         #D1FAE5;
+    --ok-text:    #065F46;
+    --warn:       #FEF3C7;
+    --warn-text:  #92400E;
+    --risk:       #FEE2E2;
+    --risk-text:  #991B1B;
+    --ink:        #1C1917;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  /* ── COVER ── */
+  .cover {
+    background: var(--navy-deep);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 80px 10vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(26,107,114,0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -100px; left: -100px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(200,168,75,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cover-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cover-eyebrow::before {
+    content: '⚓';
+    font-size: 14px;
+  }
+
+  .cover-suite {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(13px, 1.5vw, 16px);
+    font-weight: 300;
+    color: var(--teal-light);
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+
+  .cover-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(72px, 12vw, 140px);
+    font-weight: 700;
+    color: #FFFFFF;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+  }
+
+  .cover-subtitle {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(14px, 1.8vw, 18px);
+    font-weight: 400;
+    color: var(--brass);
+    letter-spacing: 0.02em;
+    margin-bottom: 16px;
+  }
+
+  .cover-tagline {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(16px, 2vw, 22px);
+    font-weight: 300;
+    font-style: italic;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 72px;
+  }
+
+  .cover-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 0.12em;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .cover-scroll {
+    position: absolute;
+    bottom: 40px;
+    right: 10vw;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+  }
+
+  .cover-scroll::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: rgba(255,255,255,0.2);
+  }
+
+  /* ── NAV ── */
+  .nav {
+    position: sticky;
+    top: 0;
+    background: rgba(13,27,48,0.96);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    padding: 0 10vw;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border-bottom: 1px solid rgba(200,168,75,0.15);
+  }
+
+  .nav-brand {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--brass);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 18px 0;
+    margin-right: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 0;
+    list-style: none;
+  }
+
+  .nav-links a {
+    display: block;
+    padding: 18px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--brass); }
+
+  /* ── LAYOUT ── */
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 40px;
+  }
+
+  /* ── SECTIONS ── */
+  .section {
+    padding: 80px 0 40px;
+    border-top: 1px solid var(--border);
+  }
+
+  .section:first-child { border-top: none; }
+
+  .section-number {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--brass);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-number::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    max-width: 60px;
+  }
+
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(28px, 4vw, 42px);
+    font-weight: 600;
+    color: var(--navy);
+    line-height: 1.1;
+    margin-bottom: 32px;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 40px 0 16px;
+  }
+
+  p {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--slate);
+    margin-bottom: 16px;
+  }
+
+  /* ── KEELSON INTRO BLOCK ── */
+  .keelson-block {
+    background: var(--navy);
+    border-radius: 12px;
+    padding: 48px;
+    margin: 0 0 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .keelson-block::before {
+    content: '⚓';
+    position: absolute;
+    top: -20px; right: 32px;
+    font-size: 120px;
+    opacity: 0.04;
+    line-height: 1;
+  }
+
+  .keelson-block .suite-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 16px;
+  }
+
+  .keelson-block .suite-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+
+  .keelson-block p {
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    max-width: 560px;
+    margin-bottom: 0;
+  }
+
+  .keelson-block .domain {
+    margin-top: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--teal-light);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── TABLES ── */
+  .table-wrap { overflow-x: auto; margin: 24px 0 32px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+  }
+
+  thead tr {
+    background: var(--navy);
+  }
+
+  thead th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.7);
+    white-space: nowrap;
+  }
+
+  tbody tr:nth-child(even) { background: var(--bg); }
+  tbody tr:nth-child(odd)  { background: var(--surface); }
+
+  tbody td {
+    padding: 12px 16px;
+    color: var(--slate);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  tbody td:first-child {
+    font-weight: 600;
+    color: var(--navy);
+    white-space: nowrap;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .badge-ok    { background: var(--ok);   color: var(--ok-text); }
+  .badge-warn  { background: var(--warn); color: var(--warn-text); }
+  .badge-muted { background: var(--bg);   color: var(--muted); border: 1px solid var(--border); }
+  .badge-teal  { background: var(--teal-faint); color: var(--teal); }
+  .badge-free  { background: var(--ok);   color: var(--ok-text); font-style: italic; }
+
+  /* ── CALLOUTS ── */
+  .callout {
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 24px 0;
+    border-left: 4px solid;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .callout-ok   { background: var(--ok);   border-color: var(--teal);  color: var(--ok-text); }
+  .callout-warn { background: var(--warn); border-color: var(--brass); color: var(--warn-text); }
+  .callout-risk { background: var(--risk); border-color: #DC2626;      color: var(--risk-text); }
+
+  .callout strong {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    opacity: 0.7;
+  }
+
+  /* ── MODULE MAP ── */
+  .module-grid {
+    display: grid;
+    gap: 12px;
+    margin: 24px 0;
+  }
+
+  .module-card {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    align-items: center;
+    gap: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 24px;
+    transition: border-color 0.2s;
+  }
+
+  .module-card:hover { border-color: var(--teal); }
+  .module-card.active { border-color: var(--teal); background: var(--teal-faint); }
+  .module-card.active .module-num { background: var(--teal); color: #fff; }
+
+  .module-num {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    background: var(--navy);
+    color: var(--brass);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .module-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--navy);
+    margin-bottom: 2px;
+  }
+
+  .module-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  .module-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  /* ── FUNNEL ── */
+  .funnel {
+    display: grid;
+    gap: 2px;
+    margin: 24px 0;
+  }
+
+  .funnel-step {
+    display: grid;
+    grid-template-columns: 28px 160px 1fr 1fr;
+    align-items: start;
+    gap: 20px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+
+  .funnel-step:hover { background: var(--bg); }
+  .funnel-step:nth-child(4) { background: var(--teal-faint); border-color: var(--teal); }
+
+  .funnel-n {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--brass);
+    font-weight: 500;
+    padding-top: 1px;
+  }
+
+  .funnel-stage {
+    font-weight: 700;
+    color: var(--navy);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .funnel-gets, .funnel-earns {
+    color: var(--slate);
+    line-height: 1.5;
+  }
+
+  .funnel-gets { color: var(--teal); }
+
+  /* ── PHASE TIMELINE ── */
+  .phases {
+    display: grid;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .phase-card {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 24px;
+    padding: 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .phase-card.now { border-color: var(--teal); background: var(--teal-faint); }
+  .phase-card.next { opacity: 0.65; }
+  .phase-card.future { opacity: 0.4; }
+
+  .phase-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding-top: 4px;
+    gap: 4px;
+  }
+
+  .phase-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--navy);
+    background: var(--navy);
+    color: var(--brass);
+    padding: 4px 10px;
+    border-radius: 5px;
+    letter-spacing: 0.05em;
+  }
+
+  .phase-badge.active { background: var(--teal); color: #fff; }
+
+  .phase-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+
+  .phase-desc {
+    font-size: 13px;
+    color: var(--slate);
+    line-height: 1.55;
+    margin-bottom: 10px;
+  }
+
+  .phase-gate {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  /* ── SCHEMA BLOCK ── */
+  .code-block {
+    background: var(--navy-deep);
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin: 20px 0;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block::before {
+    content: attr(data-lang);
+    position: absolute;
+    top: 12px; right: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(200,168,75,0.5);
+  }
+
+  .code-block pre {
+    font-family: 'DM Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: rgba(255,255,255,0.75);
+    white-space: pre;
+  }
+
+  .code-block .k  { color: #C8A84B; }   /* keyword */
+  .code-block .t  { color: #2A8A93; }   /* type */
+  .code-block .c  { color: rgba(255,255,255,0.3); font-style: italic; }  /* comment */
+  .code-block .s  { color: #A8D8A8; }   /* string */
+  .code-block .n  { color: #E8E8E8; }   /* name */
+
+  /* ── DECISIONS LOG ── */
+  .decisions {
+    display: grid;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .decision {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .decision-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px 24px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .decision-check {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--ok);
+    color: var(--ok-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .decision-q {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--navy);
+    flex: 1;
+  }
+
+  .decision-body {
+    padding: 0 24px 20px 62px;
+    font-size: 13px;
+    color: var(--slate);
+    line-height: 1.65;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+
+  .decision-body strong { color: var(--navy); }
+
+  /* ── METRICS ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+  }
+
+  .metric-phase {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin-bottom: 8px;
+  }
+
+  .metric-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--navy);
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .metric-target {
+    font-size: 12px;
+    color: var(--teal);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .metric-how {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* ── NEXT ACTIONS ── */
+  .actions {
+    counter-reset: actions;
+    display: grid;
+    gap: 12px;
+    margin: 24px 0;
+  }
+
+  .action {
+    counter-increment: actions;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 18px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--slate);
+    line-height: 1.5;
+  }
+
+  .action::before {
+    content: counter(actions);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--brass);
+    background: var(--navy);
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ── BOUNDARIES TABLE ── */
+  .boundary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+
+  .boundary-col { border-radius: 10px; overflow: hidden; }
+
+  .boundary-head {
+    background: var(--navy);
+    color: var(--brass);
+    padding: 14px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .boundary-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    padding: 12px 18px;
+    font-size: 12px;
+    color: var(--slate);
+    line-height: 1.5;
+  }
+
+  .boundary-item.risk-item {
+    background: var(--risk);
+    color: var(--risk-text);
+    font-weight: 600;
+    font-size: 11px;
+  }
+
+  /* ── FREE TIER TABLE ── */
+  .tier-table {
+    display: grid;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 24px 0;
+  }
+
+  .tier-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 1fr;
+    background: var(--surface);
+    gap: 0;
+  }
+
+  .tier-row.header {
+    background: var(--navy);
+  }
+
+  .tier-cell {
+    padding: 13px 16px;
+    font-size: 13px;
+    color: var(--slate);
+    line-height: 1.4;
+    border-right: 1px solid var(--border);
+  }
+
+  .tier-cell:last-child { border-right: none; }
+
+  .tier-row.header .tier-cell {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .tier-cell.check-free  { color: var(--ok-text); font-size: 16px; text-align: center; font-weight: 700; }
+  .tier-cell.check-paid  { color: var(--teal); font-size: 16px; text-align: center; font-weight: 700; }
+  .tier-cell.check-no    { color: var(--ghost); font-size: 16px; text-align: center; }
+
+  .tier-row.paid-feature { background: var(--teal-faint); }
+  .tier-row.paid-feature .tier-cell { color: var(--teal); }
+
+  /* ── FOOTER ── */
+  .footer {
+    background: var(--navy-deep);
+    padding: 48px 10vw;
+    margin-top: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .footer-brand {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .footer-brand span { color: var(--brass); }
+
+  .footer-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.25);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* ── PROSE LIST ── */
+  ul.prose-list {
+    list-style: none;
+    margin: 16px 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  ul.prose-list li {
+    display: flex;
+    gap: 12px;
+    font-size: 14px;
+    color: var(--slate);
+    line-height: 1.55;
+    align-items: flex-start;
+  }
+
+  ul.prose-list li::before {
+    content: '—';
+    color: var(--brass);
+    font-family: 'DM Mono', monospace;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── IDENTITY TABLE ── */
+  .identity-grid {
+    display: grid;
+    gap: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin: 24px 0;
+  }
+
+  .identity-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .identity-row:last-child { border-bottom: none; }
+
+  .identity-key {
+    padding: 14px 20px;
+    background: var(--navy);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    display: flex;
+    align-items: center;
+  }
+
+  .identity-val {
+    padding: 14px 20px;
+    font-size: 14px;
+    color: var(--slate);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    line-height: 1.4;
+  }
+
+  .identity-val.highlight {
+    background: var(--ok);
+    color: var(--ok-text);
+    font-weight: 700;
+  }
+
+  .identity-val.teal-highlight {
+    background: var(--teal-faint);
+    color: var(--teal);
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 680px) {
+    .page { padding: 0 20px; }
+    .cover { padding: 60px 24px; }
+    .funnel-step { grid-template-columns: 28px 1fr; }
+    .funnel-step .funnel-gets, .funnel-step .funnel-earns { display: none; }
+    .boundary-grid { grid-template-columns: 1fr; }
+    .tier-row { grid-template-columns: 1fr 60px 60px; }
+    .tier-cell:last-child { display: none; }
+    .module-card { grid-template-columns: 44px 1fr; }
+    .module-status { display: none; }
+    .nav-links { display: none; }
+    .metrics-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .cover-eyebrow  { animation: fadeUp 0.6s ease both; }
+  .cover-suite    { animation: fadeUp 0.6s 0.1s ease both; }
+  .cover-title    { animation: fadeUp 0.7s 0.2s ease both; }
+  .cover-subtitle { animation: fadeUp 0.6s 0.35s ease both; }
+  .cover-tagline  { animation: fadeUp 0.6s 0.45s ease both; }
+  .cover-meta     { animation: fadeUp 0.6s 0.55s ease both; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="cover-eyebrow">Keelson · Titania Labs LLC · Confidential</div>
+  <div class="cover-suite">Module 00 of the Keelson suite</div>
+  <div class="cover-title">Lodestar</div>
+  <div class="cover-subtitle">Project Brief · v0.2 · March 2026</div>
+  <div class="cover-tagline">"Every session remembers where you left off."</div>
+  <div class="cover-meta">
+    <span>Session Context Layer</span>
+    <span>·</span>
+    <span>Free forever</span>
+    <span>·</span>
+    <span>keelson.io</span>
+  </div>
+  <div class="cover-scroll">scroll</div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-brand">⚓ Keelson · Lodestar</div>
+  <ul class="nav-links">
+    <li><a href="#suite">Suite</a></li>
+    <li><a href="#community">Community</a></li>
+    <li><a href="#sequencing">MCDA</a></li>
+    <li><a href="#summary">Summary</a></li>
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#phases">Phases</a></li>
+    <li><a href="#decisions">Decisions</a></li>
+    <li><a href="#actions">Actions</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+
+  <!-- 01 KEELSON SUITE -->
+  <div class="section" id="suite">
+    <div class="section-number">01</div>
+    <div class="section-title">Keelson: The Suite</div>
+
+    <div class="keelson-block">
+      <div class="suite-label">Suite brand · Titania Labs LLC</div>
+      <div class="suite-name">Keelson</div>
+      <p>A keelson is the internal structural member that runs along the top of a vessel's keel, reinforcing the backbone from within. Without the keelson, the keel flexes and fails under load. Keelson is the internal structure that keeps your product build from drifting, fragmenting, and failing under pressure.</p>
+      <div class="domain">keelson.io · Register immediately</div>
+    </div>
+
+    <p>The reference model is Adobe Creative Suite — Titania Labs is the company, Keelson is the product family brand, and individual tools are named modules within the suite. Users identify with Keelson. They buy into Keelson. They recommend Keelson.</p>
+
+    <h3>The Keelson Module Map</h3>
+    <div class="module-grid">
+      <div class="module-card active">
+        <div class="module-num">00</div>
+        <div>
+          <div class="module-name">Lodestar</div>
+          <div class="module-desc">Session Context — foundational infrastructure; community candy; suite on-ramp</div>
+        </div>
+        <div class="module-status"><span class="badge badge-ok">Active build</span></div>
+      </div>
+      <div class="module-card">
+        <div class="module-num">01</div>
+        <div>
+          <div class="module-name">Vela</div>
+          <div class="module-desc">Intent Preservation — captures design intent after vibe-coding sessions</div>
+        </div>
+        <div class="module-status"><span class="badge badge-muted">Staged</span></div>
+      </div>
+      <div class="module-card">
+        <div class="module-num">02</div>
+        <div>
+          <div class="module-name">Shuffle</div>
+          <div class="module-desc">Design → Code — bilingual submission system; developer trust gate</div>
+        </div>
+        <div class="module-status"><span class="badge badge-warn">Pre-discovery</span></div>
+      </div>
+      <div class="module-card">
+        <div class="module-num">03</div>
+        <div>
+          <div class="module-name">Kite</div>
+          <div class="module-desc">QA + Security — static security scanner; embedded trust gate in Shuffle</div>
+        </div>
+        <div class="module-status"><span class="badge badge-warn">Pre-launch</span></div>
+      </div>
+      <div class="module-card">
+        <div class="module-num">04</div>
+        <div>
+          <div class="module-name">Pharos</div>
+          <div class="module-desc">Institutional Memory — AI-powered design archive; natural language retrieval</div>
+        </div>
+        <div class="module-status"><span class="badge badge-muted">In build</span></div>
+      </div>
+      <div class="module-card">
+        <div class="module-num">05–08</div>
+        <div>
+          <div class="module-name">Ship / Monitor / Iterate</div>
+          <div class="module-desc">Deploy intelligence, post-ship monitoring, iteration loop</div>
+        </div>
+        <div class="module-status"><span class="badge badge-muted">Placeholder</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 COMMUNITY STRATEGY -->
+  <div class="section" id="community">
+    <div class="section-number">02</div>
+    <div class="section-title">Community Strategy &amp; Monetization</div>
+
+    <p>Keelson's go-to-market is community-first. Lodestar is not the revenue source — it is the trust-builder, the audience-generator, and the on-ramp. The suite earns revenue when users who trust Keelson because of Lodestar are ready to buy the tools that extend it.</p>
+
+    <h3>The Funnel</h3>
+    <div class="funnel">
+      <div class="funnel-step" style="background:var(--navy);border-radius:8px 8px 0 0;">
+        <div class="funnel-n" style="color:var(--brass);">01</div>
+        <div class="funnel-stage" style="color:#fff;">Community Candy</div>
+        <div class="funnel-gets" style="color:rgba(255,255,255,0.55);">Free Lodestar — all phases, forever. No paywall, no nag screens.</div>
+        <div class="funnel-earns" style="color:rgba(255,255,255,0.4);">GitHub stars, community trust, newsletter signups</div>
+      </div>
+      <div class="funnel-step">
+        <div class="funnel-n">02</div>
+        <div class="funnel-stage">Newsletter Capture</div>
+        <div class="funnel-gets">Build-in-public newsletter — decisions, products, IPE progress</div>
+        <div class="funnel-earns">Owned audience; narrative trust before paid products exist</div>
+      </div>
+      <div class="funnel-step">
+        <div class="funnel-n">03</div>
+        <div class="funnel-stage">Kite Conversion</div>
+        <div class="funnel-gets">Founding-member discount via newsletter when Kite launches</div>
+        <div class="funnel-earns">First revenue signal; validates willingness to pay</div>
+      </div>
+      <div class="funnel-step">
+        <div class="funnel-n">04</div>
+        <div class="funnel-stage">Keelson Membership</div>
+        <div class="funnel-gets">Monthly/annual membership unlocks full suite at Module 3</div>
+        <div class="funnel-earns">Recurring revenue; framework subscription; founding-tier lock</div>
+      </div>
+    </div>
+
+    <div class="callout callout-ok">
+      <strong>Core principle</strong>
+      Lodestar stays free — all of it, all phases, forever. The moment Lodestar features are paywalled, it stops being community candy and becomes a product competing on its own merits. This commitment is made before any community exists so it can never be broken retroactively.
+    </div>
+
+    <h3>Free Tier — Locked Permanently</h3>
+    <div class="tier-table">
+      <div class="tier-row header">
+        <div class="tier-cell">Feature</div>
+        <div class="tier-cell">Free</div>
+        <div class="tier-cell">Paid</div>
+        <div class="tier-cell">Rationale</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell">lodestar_synthesize() — manual session context</div>
+        <div class="tier-cell check-free">✓</div>
+        <div class="tier-cell check-paid">✓</div>
+        <div class="tier-cell">Core free tier — must remain genuinely useful</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell">lodestar_load() — warm session boot</div>
+        <div class="tier-cell check-free">✓</div>
+        <div class="tier-cell check-paid">✓</div>
+        <div class="tier-cell">Primary daily value — must stay free</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell">lodestar_diff() — drift detection</div>
+        <div class="tier-cell check-free">✓</div>
+        <div class="tier-cell check-paid">✓</div>
+        <div class="tier-cell">Free per community candy commitment</div>
+      </div>
+      <div class="tier-row">
+        <div class="tier-cell">Cross-project pattern diffing (Phase 3)</div>
+        <div class="tier-cell check-free">✓</div>
+        <div class="tier-cell check-paid">✓</div>
+        <div class="tier-cell">Lodestar free forever — all phases</div>
+      </div>
+      <div class="tier-row paid-feature">
+        <div class="tier-cell">Keelson suite integration (Vela/Kite context)</div>
+        <div class="tier-cell check-no">—</div>
+        <div class="tier-cell check-paid">✓</div>
+        <div class="tier-cell">Additive paid feature; connector between modules</div>
+      </div>
+      <div class="tier-row paid-feature">
+        <div class="tier-cell">Priority support + build-in-public access</div>
+        <div class="tier-cell check-no">—</div>
+        <div class="tier-cell check-paid">✓</div>
+        <div class="tier-cell">Relationship feature — not a feature gate</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 MCDA -->
+  <div class="section" id="sequencing">
+    <div class="section-number">03</div>
+    <div class="section-title">Build Sequencing: MCDA</div>
+    <p>The sequencing claim — "build Lodestar first" — evaluated against Kite First, the highest-readiness alternative in the current portfolio.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Criterion</th><th>Weight</th><th>Lodestar First</th><th>Kite First</th><th>Winner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Revenue proximity</td><td>High</td><td style="color:#DC2626">Weak — no pricing model</td><td style="color:#059669">Strong — backend complete</td><td><span class="badge badge-ok">Kite ✓</span></td></tr>
+          <tr><td>Community candy fit</td><td>High</td><td style="color:#059669">Strong — builds Keelson audience</td><td style="color:#D97706">Weak — security scanner is a product, not a gift</td><td><span class="badge badge-warn">Lodestar ✓</span></td></tr>
+          <tr><td>Concept clarity</td><td>High</td><td style="color:#D97706">Mixed — Vela/Pharos overlap unresolved</td><td style="color:#059669">High — well scoped</td><td><span class="badge badge-ok">Kite ✓</span></td></tr>
+          <tr><td>User validation need</td><td>Med</td><td style="color:#059669">Low — Ken IS the primary user</td><td style="color:#059669">Low — same</td><td>Tie</td></tr>
+          <tr><td>Strategic leverage</td><td>High</td><td style="color:#059669">Strong — builds audience for full suite</td><td>Moderate — standalone</td><td><span class="badge badge-warn">Lodestar ✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-ok">
+      <strong>Verdict</strong>
+      Lodestar first is correct given the Keelson community strategy. Lodestar builds the audience Kite needs to convert. Critical condition: Phase 1a must ship within 2 weeks as a manual synthesizer. If it slips, revisit sequencing in favour of Kite.
+    </div>
+  </div>
+
+  <!-- 04 SUMMARY -->
+  <div class="section" id="summary">
+    <div class="section-number">04</div>
+    <div class="section-title">Product Summary</div>
+
+    <div class="identity-grid">
+      <div class="identity-row"><div class="identity-key">Suite</div><div class="identity-val">Keelson — keelson.io</div></div>
+      <div class="identity-row"><div class="identity-key">Product</div><div class="identity-val">Lodestar — Module 00</div></div>
+      <div class="identity-row"><div class="identity-key">Tagline</div><div class="identity-val" style="font-style:italic;color:var(--navy)">"Every session remembers where you left off."</div></div>
+      <div class="identity-row"><div class="identity-key">Primary user</div><div class="identity-val">Solo vibe-coding founders using Claude Code, Cursor, Windsurf, or any AI coding tool</div></div>
+      <div class="identity-row"><div class="identity-key">Core problem</div><div class="identity-val">Session amnesia — every Claude Code session starts cold, forcing re-explanation of architecture, decisions, and dependencies</div></div>
+      <div class="identity-row"><div class="identity-key">Core output</div><div class="identity-val"><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px">.lodestar.md</code> — portable, version-controlled context file</div></div>
+      <div class="identity-row"><div class="identity-key">Phase 1a scope</div><div class="identity-val">Manual MCP tool: lodestar_synthesize + lodestar_load + lodestar review</div></div>
+      <div class="identity-row"><div class="identity-key">Revenue model</div><div class="identity-val highlight">Free forever — all phases. Community candy. Newsletter capture is the conversion mechanism.</div></div>
+      <div class="identity-row"><div class="identity-key">Domain</div><div class="identity-val teal-highlight">keelson.io — register immediately</div></div>
+    </div>
+  </div>
+
+  <!-- 05 PROBLEM -->
+  <div class="section" id="problem">
+    <div class="section-number">05</div>
+    <div class="section-title">Problem Statement</div>
+
+    <h3>Session Amnesia</h3>
+    <p>Claude Code and all vibe-coding tools have no memory between sessions. Every new session starts cold. The developer spends 20–40 minutes re-establishing context, during which the AI generates plausible-but-wrong suggestions that contradict prior decisions.</p>
+
+    <ul class="prose-list">
+      <li>What architectural decisions were made and why</li>
+      <li>Which patterns are conventions vs. temporary experiments</li>
+      <li>What dependencies were introduced and what problems they solved</li>
+      <li>What was tried and explicitly rejected</li>
+      <li>What open questions remain unresolved and blocking</li>
+    </ul>
+
+    <h3>The Compounding Effect for Solo Founders</h3>
+    <p>A solo founder managing multiple products simultaneously — the exact Keelson target persona — experiences session amnesia multiplied. Working on Lodestar on Monday, Kite on Wednesday, Shuffle on Friday means operating as a team of one with no shared memory between sessions.</p>
+
+    <h3>Why Existing Solutions Fail</h3>
+    <ul class="prose-list">
+      <li><strong>CLAUDE.md files</strong> — manually maintained, frequently stale, require discipline after every session that doesn't happen</li>
+      <li><strong>Commit messages</strong> — capture what changed, not why; not queryable for "what was the decision about auth"</li>
+      <li><strong>README.md</strong> — static architecture documentation; doesn't track session-level decisions</li>
+      <li><strong>Claude.ai memory</strong> — per-conversation only; not per-project; not version-controlled</li>
+    </ul>
+  </div>
+
+  <!-- 06 SOLUTION -->
+  <div class="section" id="solution">
+    <div class="section-number">06</div>
+    <div class="section-title">Solution Definition</div>
+
+    <p>Lodestar is an MCP server that, on command, synthesizes the current Claude Code session into a structured <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px">.lodestar.md</code> context file. At the next session start, Lodestar loads this file and feeds it as context — giving any AI coding tool a warm start.</p>
+
+    <h3>The .lodestar.md Schema</h3>
+    <div class="code-block" data-lang="TypeScript">
+<pre><span class="k">interface</span> <span class="t">LodestarContext</span> {
+  <span class="n">meta</span>: {
+    <span class="n">project</span>: <span class="t">string</span>;        <span class="c">// directory name</span>
+    <span class="n">date</span>:    <span class="t">string</span>;        <span class="c">// ISO 8601</span>
+    <span class="n">model</span>:   <span class="t">string</span>;        <span class="c">// e.g. claude-sonnet-4-6</span>
+  };
+  <span class="n">decisions</span>: <span class="t">Array</span>&lt;{
+    <span class="n">decision</span>:  <span class="t">string</span>;      <span class="c">// what was decided</span>
+    <span class="n">rationale</span>: <span class="t">string</span>;      <span class="c">// why</span>
+    <span class="n">files</span>?:    <span class="t">string</span>[];    <span class="c">// affected files</span>
+  }&gt;;
+  <span class="n">patterns</span>: <span class="t">Array</span>&lt;{
+    <span class="n">pattern</span>:  <span class="t">string</span>;       <span class="c">// naming/structural convention</span>
+    <span class="n">location</span>: <span class="t">string</span>;       <span class="c">// where it's used</span>
+  }&gt;;
+  <span class="n">dependencies</span>: <span class="t">Array</span>&lt;{
+    <span class="n">package</span>: <span class="t">string</span>;        <span class="c">// npm package name</span>
+    <span class="n">purpose</span>: <span class="t">string</span>;        <span class="c">// why added this session</span>
+  }&gt;;
+  <span class="n">rejected</span>: <span class="t">Array</span>&lt;{
+    <span class="n">approach</span>: <span class="t">string</span>;       <span class="c">// what was tried</span>
+    <span class="n">reason</span>:   <span class="t">string</span>;       <span class="c">// why rejected</span>
+  }&gt;;
+  <span class="n">openQuestions</span>: <span class="t">Array</span>&lt;{
+    <span class="n">question</span>: <span class="t">string</span>;
+    <span class="n">blocking</span>: <span class="t">boolean</span>;
+  }&gt;;
+  <span class="n">nextSession</span>: <span class="t">string</span>[];    <span class="c">// what to pick up first</span>
+}</pre>
+    </div>
+  </div>
+
+  <!-- 07 PRODUCT BOUNDARIES -->
+  <div class="section" id="boundaries">
+    <div class="section-number">07</div>
+    <div class="section-title">Product Boundaries</div>
+    <p>All three products touch memory, context, and knowledge preservation. Without hard boundaries the suite fragments. These are formal boundary commitments — not working hypotheses.</p>
+
+    <div class="boundary-grid">
+      <div class="boundary-col">
+        <div class="boundary-head">Lodestar</div>
+        <div class="boundary-item">Session state — what was decided this session</div>
+        <div class="boundary-item">Established patterns in this codebase</div>
+        <div class="boundary-item">Dependencies added this session</div>
+        <div class="boundary-item">Rejected approaches and why</div>
+        <div class="boundary-item risk-item">Must NOT produce product intent docs → that is Vela's job</div>
+      </div>
+      <div class="boundary-col">
+        <div class="boundary-head">Vela</div>
+        <div class="boundary-item">Product intent — what the product is supposed to be</div>
+        <div class="boundary-item">Brief capture after vibe-coding builds</div>
+        <div class="boundary-item">Design intent preservation</div>
+        <div class="boundary-item">Concept drift prevention</div>
+        <div class="boundary-item risk-item">Must NOT watch sessions → that is Lodestar's job</div>
+      </div>
+      <div class="boundary-col">
+        <div class="boundary-head">Pharos</div>
+        <div class="boundary-item">Historical design decisions across archived projects</div>
+        <div class="boundary-item">Natural language archive retrieval</div>
+        <div class="boundary-item">Long-term institutional memory</div>
+        <div class="boundary-item">500GB+ design file indexing</div>
+        <div class="boundary-item risk-item">Must NOT manage live sessions → archive only</div>
+      </div>
+    </div>
+
+    <div class="callout callout-risk">
+      <strong>Hard Rule</strong>
+      Lodestar outputs session state. Vela outputs product intent. These are different ontologies and must never merge. If a Lodestar feature would naturally belong in Vela's domain, stop and route it to Vela. Do not expand Lodestar's scope to absorb it.
+    </div>
+  </div>
+
+  <!-- 08 PHASES -->
+  <div class="section" id="phases">
+    <div class="section-number">08</div>
+    <div class="section-title">Phased Build Plan</div>
+
+    <div class="phases">
+      <div class="phase-card now">
+        <div class="phase-label">
+          <div class="phase-badge active">1a</div>
+        </div>
+        <div>
+          <div class="phase-name">Session Synthesizer</div>
+          <div class="phase-desc">MCP tool — on command reads current session file changes and outputs structured .lodestar.md context file. Provider-agnostic (Anthropic, OpenAI, Ollama). lodestar init wizard for first-run setup. lodestar review for progressive disclosure web reader.</div>
+          <div class="phase-gate">Gate: 10 personal sessions · context loads cleanly · no manual editing required</div>
+        </div>
+      </div>
+      <div class="phase-card next">
+        <div class="phase-label">
+          <div class="phase-badge">1b</div>
+        </div>
+        <div>
+          <div class="phase-name">Drift Detector</div>
+          <div class="phase-desc">Upload a brief or prior .lodestar.md; Lodestar compares current session against it and flags decisions that contradict or diverge from original intent.</div>
+          <div class="phase-gate">Gate: Phase 1a stable · 3+ real drift detections confirmed in personal sessions</div>
+        </div>
+      </div>
+      <div class="phase-card future">
+        <div class="phase-label">
+          <div class="phase-badge">2</div>
+        </div>
+        <div>
+          <div class="phase-name">Live Background Agent</div>
+          <div class="phase-desc">Passive watcher that captures context continuously without explicit synthesize commands — fires automatically at session end.</div>
+          <div class="phase-gate">Gate: Phase 1b validated on external users (3+)</div>
+        </div>
+      </div>
+      <div class="phase-card future">
+        <div class="phase-label">
+          <div class="phase-badge">3</div>
+        </div>
+        <div>
+          <div class="phase-name">Cross-Project Diffing</div>
+          <div class="phase-desc">Compare context files across multiple projects; surface recurring patterns, repeated mistakes, and architectural inconsistencies.</div>
+          <div class="phase-gate">Gate: Phase 2 validated · 2+ active projects generating consistent context files</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 09 LODESTAR REVIEW -->
+  <div class="section" id="reader">
+    <div class="section-number">09</div>
+    <div class="section-title">lodestar review — Web Reader</div>
+
+    <p>A CLI-triggered local HTTP server that opens a browser-based progressive disclosure reader for the current .lodestar.md. It is the primary human-facing surface of Lodestar — and the community candy screenshot.</p>
+
+    <div class="code-block" data-lang="Shell">
+<pre><span class="n">lodestar review</span>
+<span class="n">lodestar review</span> <span class="k">--project</span> <span class="s">/path/to/project</span>
+<span class="n">lodestar review</span> <span class="k">--diff</span>   <span class="c"># shows changes vs. previous session</span></pre>
+    </div>
+
+    <h3>Three Disclosure Levels</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Level</th><th>Always visible?</th><th>Contains</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><span class="badge badge-ok">Always</span></td><td>Project name, date, one-sentence summary, stats bar (X decisions · Y patterns · Z questions), first next-session bullet</td></tr>
+          <tr><td>2</td><td><span class="badge badge-muted">Expand on click</span></td><td>Decisions + rationale, open questions + blocking flag, full next session briefing</td></tr>
+          <tr><td>3</td><td><span class="badge badge-muted">Nested expand</span></td><td>Patterns + file locations, dependencies + purpose, rejected approaches + reasoning</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-warn">
+      <strong>Sequencing constraint</strong>
+      Build lodestar review after synthesize and load are stable across 10 sessions. The reader is a Phase 1a polish item — not a Phase 1a prerequisite. Ship the MCP tools first.
+    </div>
+  </div>
+
+  <!-- 10 DECISIONS -->
+  <div class="section" id="decisions">
+    <div class="section-number">10</div>
+    <div class="section-title">Decisions — Locked</div>
+    <p>These were open questions. They are now decided. Do not reopen them.</p>
+
+    <div class="decisions">
+      <div class="decision">
+        <div class="decision-header">
+          <div class="decision-check">✓</div>
+          <div class="decision-q">.lodestar.md committed or gitignored?</div>
+        </div>
+        <div class="decision-body">
+          <strong>Committed.</strong> Version control of decisions is a feature, not a side effect. Add .lodestar.history/ to .gitignore — that directory is local recovery only.
+        </div>
+      </div>
+      <div class="decision">
+        <div class="decision-header">
+          <div class="decision-check">✓</div>
+          <div class="decision-q">Replace or append on re-synthesis?</div>
+        </div>
+        <div class="decision-body">
+          <strong>Replace with shallow history rotation.</strong> .lodestar.md is always overwritten with current session context. Before overwriting, the previous file moves to .lodestar.history/YYYY-MM-DD-HH-MM.md. Maximum 3 history files kept; oldest pruned automatically. Append rejected: appended files degrade into session logs.
+        </div>
+      </div>
+      <div class="decision">
+        <div class="decision-header">
+          <div class="decision-check">✓</div>
+          <div class="decision-q">Provider-agnostic or Anthropic-only?</div>
+        </div>
+        <div class="decision-body">
+          <strong>Provider-agnostic.</strong> Lodestar is community candy for the full vibe-coding audience — Claude Code, Cursor, Windsurf. Locking to Anthropic costs newsletter signups and Keelson audience growth. LLMProvider interface abstracts the synthesis call. Anthropic is the default and recommended provider. OpenAI and Ollama ship as alternatives.
+        </div>
+      </div>
+      <div class="decision">
+        <div class="decision-header">
+          <div class="decision-check">✓</div>
+          <div class="decision-q">How does the user configure their API key?</div>
+        </div>
+        <div class="decision-body">
+          <strong>Via lodestar init wizard.</strong> Key stored in ~/.lodestar.config.json. Never in a project repo, never in mcp.json, never in .env in production. The wizard validates the key before saving and opens the provider's console in the browser if the user doesn't have one.
+        </div>
+      </div>
+      <div class="decision">
+        <div class="decision-header">
+          <div class="decision-check">✓</div>
+          <div class="decision-q">Does Lodestar cost Ken anything per synthesis?</div>
+        </div>
+        <div class="decision-body">
+          <strong>No.</strong> Lodestar runs entirely on the user's machine using their own API key. Ken pays nothing per synthesis. User cost is ~$0.01–0.05 per synthesis — negligible alongside a full AI coding session. Ollama users pay nothing. Zero marginal cost to Titania Labs at any scale.
+        </div>
+      </div>
+      <div class="decision">
+        <div class="decision-header">
+          <div class="decision-check">✓</div>
+          <div class="decision-q">Token budget for the LLM call?</div>
+        </div>
+        <div class="decision-body">
+          <strong>6,000 tokens max input.</strong> If the diff exceeds this, truncate git diff to the most recently modified files first and log a warning. Never silently truncate. For Anthropic/OpenAI, use SDK token counting. For Ollama, estimate at 4 characters per token.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11 METRICS -->
+  <div class="section" id="metrics">
+    <div class="section-number">11</div>
+    <div class="section-title">Success Metrics</div>
+
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-phase">Phase 1a</div>
+        <div class="metric-name">Context file load success</div>
+        <div class="metric-target">10/10 sessions clean</div>
+        <div class="metric-how">Ken's subjective log of cold-start quality</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-phase">Phase 1a</div>
+        <div class="metric-name">Session ramp time</div>
+        <div class="metric-target">&gt;50% reduction</div>
+        <div class="metric-how">Time to first meaningful output with vs. without Lodestar</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-phase">Phase 1b</div>
+        <div class="metric-name">Drift detection accuracy</div>
+        <div class="metric-target">3+ true positives</div>
+        <div class="metric-how">Ken retrospective review of all flagged items</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-phase">Post-launch</div>
+        <div class="metric-name">Newsletter signups</div>
+        <div class="metric-target">100 in 30 days</div>
+        <div class="metric-how">Newsletter platform subscriber count</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-phase">Post-launch</div>
+        <div class="metric-name">GitHub stars</div>
+        <div class="metric-target">50 in 30 days</div>
+        <div class="metric-how">Repository star count — organic audience signal</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-phase">Phase 1a</div>
+        <div class="metric-name">Time to first .lodestar.md</div>
+        <div class="metric-target">&lt;2 weeks</div>
+        <div class="metric-how">Build start date vs. first successful synthesis</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 12 NEXT ACTIONS -->
+  <div class="section" id="actions">
+    <div class="section-number">12</div>
+    <div class="section-title">Next Actions</div>
+    <p>Sequenced. Do not move to the next item until the current one is complete.</p>
+
+    <div class="actions">
+      <div class="action">Register keelson.io and keelson.co immediately — before this document is shared externally.</div>
+      <div class="action">Confirm Lodestar / Vela / Pharos boundary from Section 07. Log decision to Notion.</div>
+      <div class="action">Lock the free tier definition from Section 02. This is a public commitment once Lodestar ships — cannot be revised downward.</div>
+      <div class="action">Define .lodestar.md schema — exact fields, types, nesting. This drives the synthesis prompt.</div>
+      <div class="action">Write and test synthesis prompt against a real recent session manually — before writing any code.</div>
+      <div class="action">Build Phase 1a MCP server: lodestar_synthesize() and lodestar_load() only. Build lodestar init wizard.</div>
+      <div class="action">Register in Claude Desktop mcp.json. Confirm tools callable from Claude Desktop and Claude Code.</div>
+      <div class="action">Run 10 personal sessions on Titania Labs projects. Log context quality and schema gaps.</div>
+      <div class="action">Phase 1a gate review: metrics met? Build lodestar review web reader. If not met, iterate.</div>
+      <div class="action">Draft 6-issue newsletter backlog before public launch. Do not open signup until backlog exists.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-brand">Lodestar · <span>Keelson</span></div>
+  <div class="footer-meta">
+    Module 00 · Titania Labs LLC<br>
+    Project Brief v0.2 · March 2026<br>
+    keelson.io · Confidential
+  </div>
+</div>
+
+</body>
+</html>

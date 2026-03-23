@@ -74,8 +74,117 @@ function renderDiffPanel(
   return lines.join("\n");
 }
 
+function extractHtmlBody(html: string): string {
+  // Extract the <style> blocks and body content, drop doctype/html/head wrapper
+  const styles: string[] = [];
+  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = styleRegex.exec(html)) !== null) {
+    styles.push(`<style>${m[1]}</style>`);
+  }
+
+  // Extract body content
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : html;
+
+  // Extract any scripts
+  const scripts: string[] = [];
+  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  while ((m = scriptRegex.exec(bodyContent)) !== null) {
+    scripts.push(m[0]);
+  }
+  const bodyWithoutScripts = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+
+  // Also grab font links from head
+  const fontLinks: string[] = [];
+  const linkRegex = /<link[^>]*href="[^"]*fonts[^"]*"[^>]*>/gi;
+  while ((m = linkRegex.exec(html)) !== null) {
+    fontLinks.push(m[0]);
+  }
+
+  return fontLinks.join("\n") + "\n" + styles.join("\n") + "\n" + bodyWithoutScripts + "\n" + scripts.join("\n");
+}
+
+function treeToMermaid(tree: string): string | null {
+  const lines = tree.split("\n").filter((l) => l.trim());
+  if (lines.length < 2) return null;
+
+  const nodes: Array<{ id: string; label: string; parent: string | null; depth: number }> = [];
+  let nodeId = 0;
+
+  for (const line of lines) {
+    // Count depth by position of the name (after tree chars)
+    const cleaned = line.replace(/[│├└──\s]/g, "").replace(/←.*$/, "").trim();
+    if (!cleaned) continue;
+
+    const depth = Math.floor((line.search(/[^\s│]/) || 0) / 4);
+    const label = cleaned.replace(/[/]/g, "");
+    const id = `n${nodeId++}`;
+
+    // Find parent — last node with depth - 1
+    let parent: string | null = null;
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      if (nodes[i].depth === depth - 1) {
+        parent = nodes[i].id;
+        break;
+      }
+    }
+
+    nodes.push({ id, label, parent, depth });
+  }
+
+  if (nodes.length < 2) return null;
+
+  const mermaidLines = ["graph TD"];
+  for (const node of nodes) {
+    if (node.parent) {
+      mermaidLines.push(`    ${node.parent}[${nodes.find((n) => n.id === node.parent)?.label}] --> ${node.id}[${node.label}]`);
+    }
+  }
+
+  // Dedupe edges
+  const seen = new Set<string>();
+  const deduped = [mermaidLines[0]];
+  for (let i = 1; i < mermaidLines.length; i++) {
+    if (!seen.has(mermaidLines[i])) {
+      seen.add(mermaidLines[i]);
+      deduped.push(mermaidLines[i]);
+    }
+  }
+
+  return deduped.join("\n");
+}
+
 function markdownToHtml(md: string): string {
-  let html = escapeHtml(md);
+  // Extract code blocks BEFORE escaping to preserve special chars
+  const codeBlocks: string[] = [];
+  let processed = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang: string, code: string) => {
+    let replacement: string;
+    if (lang === "mermaid") {
+      replacement = `<pre class="mermaid">${code}</pre>`;
+    } else if (code.includes("├──") || code.includes("└──")) {
+      const mermaidCode = treeToMermaid(code);
+      replacement = mermaidCode
+        ? `<div class="mermaid-diagram"><pre class="mermaid">${mermaidCode}</pre></div>`
+        : `<pre class="prd-pre"><code>${escapeHtml(code)}</code></pre>`;
+    } else if (code.includes("╔") || code.includes("═") || code.includes("║") || code.includes("┌") || code.includes("━")) {
+      replacement = `<div class="prd-wireframe"><pre>${escapeHtml(code)}</pre></div>`;
+    } else {
+      replacement = `<pre class="prd-pre"><code>${escapeHtml(code)}</code></pre>`;
+    }
+    const placeholder = `<!--CODEBLOCK_${codeBlocks.length}-->`;
+    codeBlocks.push(replacement);
+    return placeholder;
+  });
+
+  // Now escape the rest
+  let html = escapeHtml(processed);
+
+  // Restore code blocks
+  for (let i = 0; i < codeBlocks.length; i++) {
+    html = html.replace(`&lt;!--CODEBLOCK_${i}--&gt;`, codeBlocks[i]);
+  }
+
   // Headers
   html = html.replace(/^######\s+(.+)$/gm, '<h6>$1</h6>');
   html = html.replace(/^#####\s+(.+)$/gm, '<h5>$1</h5>');
@@ -89,8 +198,6 @@ function markdownToHtml(md: string): string {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code class="prd-code">$1</code>');
-  // Code blocks
-  html = html.replace(/```[\w]*\n([\s\S]*?)```/g, '<pre class="prd-pre"><code>$1</code></pre>');
   // Horizontal rules
   html = html.replace(/^---$/gm, '<hr class="prd-hr">');
   // Tables (basic)
@@ -118,7 +225,8 @@ function markdownToHtml(md: string): string {
 export function renderReaderHTML(
   context: LodestarContext | null,
   historyContext: LodestarContext | null,
-  prd: { filename: string; content: string } | null = null
+  prd: { filename: string; content: string } | null = null,
+  briefHtml: string | null = null
 ): string {
   if (!context) {
     return `<!DOCTYPE html><html><head><title>Lodestar</title></head><body><h1>No .lodestar.md found</h1><p>Run <code>lodestar save</code> or <code>lodestar end</code> to create one.</p></body></html>`;
@@ -136,6 +244,12 @@ export function renderReaderHTML(
   const questionCount = c.openQuestions.length;
   const rejectedCount = c.rejected.length;
   const blockingCount = c.openQuestions.filter((q) => q.blocking).length;
+
+  const doneCount = (c.features ?? []).filter(f => f.status === "complete").length;
+  const progressCount = (c.features ?? []).filter(f => f.status === "in-progress").length;
+  const notStartedCount = (c.features ?? []).filter(f => f.status === "not-started").length;
+  const avgComplete = featureCount > 0 ? Math.round((c.features ?? []).reduce((sum, f) => sum + f.percentComplete, 0) / featureCount) : 0;
+  const remaining = 100 - avgComplete;
 
   const diffHtml = historyContext ? renderDiffPanel(c, historyContext) : "";
 
@@ -187,7 +301,7 @@ body {
   line-height: 1.6;
   padding: 2rem 1rem;
 }
-.container { max-width: 760px; margin: 0 auto; }
+.container { max-width: 1024px; margin: 0 auto; }
 .header {
   display: flex;
   align-items: center;
@@ -238,14 +352,15 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   overflow: hidden;
 }
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.875rem 1rem;
+  padding: 0 1rem;
+  height: 36px;
   cursor: pointer;
   user-select: none;
   font-weight: 600;
@@ -329,49 +444,67 @@ body {
 .brief-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 0.75rem;
 }
 .brief-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal); font-weight: 600; }
-.brief-overall { font-size: 1.25rem; font-weight: 700; color: var(--brass); }
-.feature-row {
+.brief-overall { font-size: 0.8rem; font-weight: 600; color: var(--brass); text-transform: uppercase; letter-spacing: 0.05em; }
+.feature-grid {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
+  flex-direction: column;
+  gap: 0;
+}
+.feature-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0 12px;
+  padding: 0.6rem 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+  align-items: start;
 }
 .feature-row:last-child { border-bottom: none; }
+.feature-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  overflow: hidden;
+  max-width: 120px;
+}
 .feature-status {
-  font-size: 0.65rem;
+  font-size: 0.585rem;
   font-weight: 700;
   text-transform: uppercase;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
   white-space: nowrap;
-  min-width: 80px;
   text-align: center;
 }
 .status-complete { background: var(--add); color: white; }
 .status-in-progress { background: var(--change); color: white; }
 .status-not-started { background: var(--border); color: var(--text-muted); }
-.feature-name { flex: 1; font-weight: 500; }
-.feature-notes { color: var(--text-muted); font-size: 0.8rem; }
+.feature-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
 .feature-bar-wrap {
-  width: 80px;
-  height: 6px;
+  flex: 1;
+  height: 5px;
   background: var(--border);
   border-radius: 3px;
   overflow: hidden;
-  flex-shrink: 0;
 }
 .feature-bar {
   height: 100%;
   border-radius: 3px;
   transition: width 0.3s;
 }
-.feature-pct { font-size: 0.8rem; color: var(--text-muted); width: 35px; text-align: right; flex-shrink: 0; }
+.feature-pct { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
+.feature-name { font-weight: 500; }
+.feature-notes { color: var(--text-muted); font-size: 0.8rem; }
 .integrations-grid {
   display: flex;
   flex-wrap: wrap;
@@ -400,6 +533,69 @@ body {
   border-radius: 4px;
 }
 .integration-purpose { color: var(--text-muted); font-size: 0.8rem; }
+.summary-layout {
+  display: grid;
+  grid-template-columns: 1fr 250px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.summary-main { min-width: 0; }
+.summary-sidebar {
+  position: sticky;
+  top: 1rem;
+}
+.sidebar-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.sidebar-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--teal);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.sidebar-text {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+.sidebar-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  margin: 0.15rem 0.2rem 0.15rem 0;
+}
+.sidebar-integration {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0;
+  font-size: 0.8rem;
+}
+.sidebar-integration-name { font-weight: 600; color: var(--text); }
+.sidebar-integration-cat {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  color: var(--teal);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.05rem 0.3rem;
+  border-radius: 3px;
+}
+@media (max-width: 700px) {
+  .summary-layout { grid-template-columns: 1fr; }
+  .summary-sidebar { position: static; }
+}
 .tabs {
   display: flex;
   gap: 0;
@@ -421,21 +617,40 @@ body {
 .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-.prd-h1 { font-size: 1.5rem; font-weight: 700; color: var(--navy); margin: 1.5rem 0 0.75rem; }
-.prd-h2 { font-size: 1.2rem; font-weight: 600; color: var(--teal); margin: 1.25rem 0 0.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
-.prd-h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 1rem 0 0.4rem; }
-.prd-p { margin: 0.5rem 0; line-height: 1.7; }
-.prd-ul { padding-left: 1.5rem; margin: 0.5rem 0; }
-.prd-ul li { margin: 0.3rem 0; }
-.prd-code { background: var(--bg); border: 1px solid var(--border); padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.85em; font-family: 'SF Mono', 'Fira Code', monospace; }
-.prd-pre { background: var(--bg); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 0.75rem 0; font-size: 0.85rem; line-height: 1.5; }
+.prd-h1 { font-size: 1.25rem; font-weight: 700; color: var(--navy); margin: 2rem 0 0.75rem; }
+.prd-h2 {
+  font-size: 0.8rem; font-weight: 600; color: var(--teal);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin: 1.75rem 0 0.75rem; padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.prd-h3 { font-size: 0.9rem; font-weight: 600; color: var(--text); margin: 1rem 0 0.4rem; }
+.prd-p { margin: 0.4rem 0; line-height: 1.7; font-size: 0.9rem; color: var(--text); }
+.prd-ul { padding-left: 1.25rem; margin: 0.4rem 0; }
+.prd-ul li { margin: 0.25rem 0; font-size: 0.9rem; line-height: 1.6; }
+.prd-code { background: var(--bg); border: 1px solid var(--border); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.82em; font-family: 'SF Mono', 'Fira Code', monospace; }
+.prd-pre {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 0.875rem 1rem; border-radius: 8px; overflow-x: auto;
+  margin: 0.75rem 0; font-size: 0.8rem; line-height: 1.5;
+}
 .prd-pre code { background: none; border: none; padding: 0; font-family: 'SF Mono', 'Fira Code', monospace; }
 .prd-hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
-.prd-quote { border-left: 3px solid var(--brass); padding: 0.5rem 1rem; margin: 0.75rem 0; color: var(--text-muted); font-style: italic; }
-.prd-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.9rem; }
-.prd-td { padding: 0.4rem 0.75rem; border: 1px solid var(--border); }
-.prd-table tr:first-child .prd-td { font-weight: 600; background: var(--bg); }
-.prd-source { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; }
+.prd-quote {
+  border-left: 3px solid var(--brass); padding: 0.5rem 1rem;
+  margin: 0.75rem 0; color: var(--text-muted); font-size: 0.85rem;
+  background: var(--surface); border-radius: 0 8px 8px 0;
+}
+.prd-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.85rem; }
+.prd-td { padding: 0.5rem 0.75rem; border: 1px solid var(--border); }
+.prd-table tr:first-child .prd-td {
+  font-weight: 600; background: var(--teal); color: white;
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.prd-source {
+  font-size: 0.7rem; color: var(--text-muted); margin-bottom: 1rem;
+  text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+}
 .diagram-container { margin-bottom: 1rem; }
 .diagram-title { font-size: 0.85rem; font-weight: 600; color: var(--teal); margin-bottom: 0.5rem; }
 .diagram-type-tag {
@@ -471,14 +686,36 @@ body {
 .roadmap-items li { font-size: 0.85rem; padding: 0.2rem 0; color: var(--text); }
 .roadmap-items li::before { content: "○ "; color: var(--brass); }
 .prd-future-note {
-  padding: 0.75rem 1rem;
-  background: var(--bg);
+  padding: 0.6rem 1rem;
+  background: var(--surface);
   border: 1px dashed var(--border);
   border-radius: 8px;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 1.5rem;
   text-align: center;
+}
+.prd-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+.prd-wireframe {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+}
+.prd-wireframe pre {
+  font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text);
+  white-space: pre;
+  margin: 0;
 }
 </style>
 </head>
@@ -500,48 +737,33 @@ body {
 
 ${diffHtml}
 
-${c.projectSummary ? `
-<div class="brief-section" style="margin-bottom:1rem">
-  <div class="brief-title" style="margin-bottom:0.5rem">Project Overview</div>
-  <div style="font-size:0.95rem;margin-bottom:0.75rem">${escapeHtml(c.projectSummary)}</div>
-  ${(c.userSegments ?? []).length > 0 ? `
-  <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-    ${(c.userSegments ?? []).map((s) => `<span style="font-size:0.75rem;padding:0.2rem 0.6rem;background:var(--bg);border:1px solid var(--border);border-radius:12px;color:var(--text-muted)">${escapeHtml(s)}</span>`).join("")}
-  </div>` : ""}
-</div>
-` : ""}
-
-${(c.integrations ?? []).length > 0 ? `
-<div class="brief-section" style="margin-bottom:1rem">
-  <div class="brief-title" style="margin-bottom:0.5rem">Integrations & Services</div>
-  <div class="integrations-grid">
-    ${(c.integrations ?? []).map((i) => `
-    <div class="integration-chip">
-      <span class="integration-name">${escapeHtml(i.name)}</span>
-      <span class="integration-cat">${escapeHtml(i.category)}</span>
-    </div>`).join("")}
-  </div>
-</div>
-` : ""}
+<div class="summary-layout">
+<div class="summary-main">
 
 ${featureCount > 0 ? `
 <div class="brief-section">
   <div class="brief-header">
     <span class="brief-title">Project Brief Status</span>
-    <span class="brief-overall">${overallPercent}% complete</span>
+    <span class="brief-overall">${overallPercent}% COMPLETE</span>
   </div>
+  <div class="feature-grid">
   ${(c.features ?? []).map((f) => {
     const barColor = f.status === "complete" ? "var(--add)" : f.status === "in-progress" ? "var(--change)" : "var(--border)";
     const statusClass = f.status === "complete" ? "status-complete" : f.status === "in-progress" ? "status-in-progress" : "status-not-started";
     const statusLabel = f.status === "complete" ? "Done" : f.status === "in-progress" ? "In Progress" : "Not Started";
     return `
-  <div class="feature-row">
-    <span class="feature-status ${statusClass}">${statusLabel}</span>
-    <span class="feature-name">${escapeHtml(f.feature)}${f.notes ? `<br><span class="feature-notes">${escapeHtml(f.notes)}</span>` : ""}</span>
-    <div class="feature-bar-wrap"><div class="feature-bar" style="width:${f.percentComplete}%;background:${barColor}"></div></div>
-    <span class="feature-pct">${f.percentComplete}%</span>
-  </div>`;
+    <div class="feature-row">
+      <div class="feature-left">
+        <span class="feature-status ${statusClass}">${statusLabel}</span>
+        <div class="feature-progress">
+          <div class="feature-bar-wrap"><div class="feature-bar" style="width:${f.percentComplete}%;background:${barColor}"></div></div>
+          <span class="feature-pct">${f.percentComplete}%</span>
+        </div>
+      </div>
+      <span class="feature-name">${escapeHtml(f.feature)}${f.notes ? `<br><span class="feature-notes">${escapeHtml(f.notes)}</span>` : ""}</span>
+    </div>`;
   }).join("")}
+  </div>
 </div>
 ` : ""}
 
@@ -661,6 +883,39 @@ ${(c.futurePhases ?? []).length > 0 ? `
   </div>
 </div>
 
+</div><!-- end summary-main -->
+
+<div class="summary-sidebar">
+${c.projectSummary ? `
+  <div class="sidebar-section">
+    <div class="sidebar-title">Project Overview</div>
+    <div class="sidebar-text">${escapeHtml(c.projectSummary)}</div>
+    ${(c.userSegments ?? []).length > 0 ? `
+    <div style="margin-top:0.5rem">
+      ${(c.userSegments ?? []).map((s) => `<span class="sidebar-tag">${escapeHtml(s)}</span>`).join("")}
+    </div>` : ""}
+  </div>
+` : ""}
+${(c.integrations ?? []).length > 0 ? `
+  <div class="sidebar-section">
+    <div class="sidebar-title">Integrations</div>
+    ${(c.integrations ?? []).map((i) => `
+    <div class="sidebar-integration">
+      <span class="sidebar-integration-name">${escapeHtml(i.name)}</span>
+      <span class="sidebar-integration-cat">${escapeHtml(i.category)}</span>
+    </div>`).join("")}
+  </div>
+` : ""}
+  <div class="sidebar-section">
+    <div class="sidebar-title">Session</div>
+    <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">
+      ${escapeHtml(c.meta.date)}<br>
+      ${escapeHtml(c.meta.model)}${c.meta.sessionDuration ? `<br>${escapeHtml(c.meta.sessionDuration)}` : ""}
+    </div>
+  </div>
+</div><!-- end summary-sidebar -->
+
+</div><!-- end summary-layout -->
 </div><!-- end tab-summary -->
 
 <div id="tab-requirements" class="tab-content">
@@ -675,7 +930,7 @@ ${prd ? `
 ` : `
   <div style="padding:2rem;text-align:center;color:var(--text-muted)">
     <p>No project requirements document found.</p>
-    <p style="font-size:0.85rem;margin-top:0.5rem">Create a <strong>CLAUDE.md</strong>, <strong>PRD.md</strong>, or <strong>BRIEF.md</strong> in your project root.</p>
+    <p style="font-size:0.85rem;margin-top:0.5rem">Create a <strong>brief.html</strong>, <strong>CLAUDE.md</strong>, or <strong>PRD.md</strong> in your project root.</p>
   </div>
 `}
 </div><!-- end tab-requirements -->
