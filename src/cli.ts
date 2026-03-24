@@ -17,6 +17,7 @@ Commands:
   lodestar save [path]             Save a mid-session checkpoint
   lodestar end [path]              End session — synthesize + commit
   lodestar review [path] [--diff]  Open session context in the browser
+  lodestar bootstrap [path]        Capture existing project structure (no LLM, free)
   lodestar hooks [path]            Install git hooks (auto-save on commit, full sync on push)
   lodestar hooks --remove [path]   Remove git hooks
 
@@ -175,6 +176,26 @@ async function main(): Promise<void> {
           console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
         }
       }
+      break;
+    }
+    case "bootstrap": {
+      const { bootstrap: runBootstrap } = await import("./bootstrap.js");
+      const projectRoot = path.resolve(args[0] ?? process.cwd());
+      console.error(`Bootstrapping ${projectRoot} ...`);
+      const result = await runBootstrap(projectRoot);
+      if (!result.success) {
+        console.error(`✗ ${result.summary}`);
+        process.exit(1);
+      }
+      console.error(`✓ ${result.summary}`);
+      console.error(`  Written to ${result.path}`);
+      if (result.warnings) {
+        for (const w of result.warnings) {
+          console.error(`  ⚠ ${w}`);
+        }
+      }
+      console.error(`\n  This is a skeleton — decisions and rationale will be`);
+      console.error(`  populated after your first coding session with lodestar save.`);
       break;
     }
     case "review": {

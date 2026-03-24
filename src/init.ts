@@ -308,7 +308,7 @@ async function setupOllama(): Promise<{ model: string; host: string }> {
 
 async function offerFirstSynthesize(): Promise<void> {
   const wantsSynthesize = await confirm({
-    message: "Do you have a project you'd like to synthesize now?",
+    message: "Do you have a project you'd like to connect?",
     default: true,
   });
 
@@ -340,21 +340,67 @@ async function offerFirstSynthesize(): Promise<void> {
       continue;
     }
 
-    console.error(`\nSynthesizing ${resolved} ...`);
-    const result = await synthesizeContext({ projectRoot: resolved });
-
-    if (!result.success) {
-      console.error(`✗ ${result.summary}\n`);
-      const retry = await confirm({ message: "Try a different project?", default: true });
-      if (!retry) return;
-      continue;
+    // Check if .lodestar.md already exists
+    let hasLodestar = false;
+    try {
+      await fs.access(path.join(resolved, ".lodestar.md"));
+      hasLodestar = true;
+    } catch {
+      // No existing context
     }
 
-    console.error(`✓ ${result.summary}`);
-    console.error(`  Written to ${result.path}`);
-    if (result.warnings) {
-      for (const w of result.warnings) {
-        console.error(`  ⚠ ${w}`);
+    if (hasLodestar) {
+      // Existing context — offer full synthesis
+      console.error(`\nFound existing .lodestar.md — running full synthesis...`);
+      const result = await synthesizeContext({ projectRoot: resolved });
+      if (!result.success) {
+        console.error(`✗ ${result.summary}\n`);
+        const retry = await confirm({ message: "Try a different project?", default: true });
+        if (!retry) return;
+        continue;
+      }
+      console.error(`✓ ${result.summary}`);
+      console.error(`  Written to ${result.path}`);
+    } else {
+      // No context — check if project has existing code
+      let hasCode = false;
+      try {
+        const entries = await fs.readdir(resolved);
+        hasCode = entries.some((e) => e === "package.json" || e === "Cargo.toml" || e === "pyproject.toml" || e === "go.mod" || e === "src");
+      } catch {
+        hasCode = false;
+      }
+
+      if (hasCode) {
+        // Existing project, no context — bootstrap first
+        console.error(`\n  This project has existing code but no .lodestar.md.`);
+        console.error(`  Lodestar will capture your project structure now.`);
+        console.error(`  Note: decisions and rationale will improve after your`);
+        console.error(`  first real coding session.\n`);
+
+        const { bootstrap } = await import("./bootstrap.js");
+        const result = await bootstrap(resolved);
+
+        if (!result.success) {
+          console.error(`✗ ${result.summary}\n`);
+          const retry = await confirm({ message: "Try a different project?", default: true });
+          if (!retry) return;
+          continue;
+        }
+        console.error(`✓ ${result.summary}`);
+        console.error(`  Written to ${result.path}`);
+      } else {
+        // New/empty project — run full synthesis
+        console.error(`\nSynthesizing ${resolved} ...`);
+        const result = await synthesizeContext({ projectRoot: resolved });
+        if (!result.success) {
+          console.error(`✗ ${result.summary}\n`);
+          const retry = await confirm({ message: "Try a different project?", default: true });
+          if (!retry) return;
+          continue;
+        }
+        console.error(`✓ ${result.summary}`);
+        console.error(`  Written to ${result.path}`);
       }
     }
     console.error("");
