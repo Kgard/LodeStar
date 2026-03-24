@@ -259,7 +259,13 @@ export async function synthesizeContext(
   }
 
   // Check if there are any meaningful changes to synthesize
-  const hasUncommitted = gitResult.diff !== "(no uncommitted changes)";
+  // Ignore .lodestar.md itself — it's our output, not a source change
+  const diffWithoutLodestar = gitResult.diff
+    .split("\n")
+    .filter((l) => !l.includes(".lodestar.md"))
+    .join("\n")
+    .trim();
+  const hasUncommitted = diffWithoutLodestar !== "" && diffWithoutLodestar !== "(no uncommitted changes)";
   const hasCommitted = gitResult.committedDiff !== "(no committed changes since last synthesis)";
   const hasChanges = hasUncommitted || hasCommitted;
 
