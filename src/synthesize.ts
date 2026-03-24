@@ -7,8 +7,9 @@ import { captureGitSnapshot, isGitError } from "./git.js";
 import { readConfig } from "./config.js";
 import { getProvider } from "./providers/index.js";
 import { rotateHistory } from "./history.js";
-import { contextToMarkdown, type LodestarContext } from "./schema.js";
+import { contextToMarkdown, parseMarkdown, type LodestarContext } from "./schema.js";
 import { loadPromptTemplate } from "./prompt.js";
+import { verifyOpenQuestions } from "./verify-questions.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const TOKEN_BUDGET = 6000;
@@ -259,8 +260,31 @@ export async function synthesizeContext(
 
   // Read existing context if present
   let existingContext: string | null = null;
+  let resolvedQuestionsNote = "";
   try {
     existingContext = await fs.readFile(filePath, "utf-8");
+
+    // Verify open questions against evidence
+    const existingParsed = parseMarkdown(existingContext);
+    if (existingParsed.openQuestions.length > 0) {
+      // Find last synthesis commit for evidence checking
+      const { simpleGit } = await import("simple-git");
+      const git = simpleGit(resolved);
+      let lastCommit: string | null = null;
+      try {
+        const log = await git.log({ file: LODESTAR_FILENAME, maxCount: 1 });
+        lastCommit = log.latest?.hash ?? null;
+      } catch {
+        // Ignore
+      }
+
+      const verified = await verifyOpenQuestions(resolved, existingParsed.openQuestions, lastCommit);
+      const resolvedOnes = verified.filter((v) => v.resolved);
+      if (resolvedOnes.length > 0) {
+        resolvedQuestionsNote = "\n\n**Verified resolved (DROP these from open questions):**\n" +
+          resolvedOnes.map((v) => `- "${v.question}" → RESOLVED: ${v.evidence}`).join("\n");
+      }
+    }
   } catch {
     // No existing context
   }
@@ -289,6 +313,10 @@ export async function synthesizeContext(
     return { success: false, path: filePath, summary: "Failed to load synthesis prompt template" };
   }
 
+  const contextWithVerification = existingContext
+    ? existingContext + resolvedQuestionsNote
+    : null;
+
   const inputText = buildInput({
     gitDiff: truncatedDiff,
     committedDiff: truncatedCommittedDiff,
@@ -297,7 +325,7 @@ export async function synthesizeContext(
     packageChanges: gitResult.packageChanges,
     sessionNotes: input.sessionNotes ?? null,
     projectName,
-    existingContext,
+    existingContext: contextWithVerification,
   });
 
   // Call LLM
