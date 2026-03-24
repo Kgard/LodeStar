@@ -4,9 +4,21 @@
 
 import path from "node:path";
 import fs from "node:fs/promises";
+import readline from "node:readline";
 import { simpleGit } from "simple-git";
 import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
+import { addNote, getNotes, clearNotes } from "./notes.js";
+
+function askNote(): Promise<string> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => {
+    rl.question("  Notes? (Enter to skip): ", (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
 
 const USAGE = `
 Lodestar — Kylex Module 00
@@ -87,13 +99,25 @@ async function runSave(args: string[]): Promise<boolean> {
     return result.updated;
   }
 
+  // Collect notes — from flag or prompt
+  const notesFlag = args.find((a) => a.startsWith("--notes="));
+  let note = notesFlag ? notesFlag.split("=").slice(1).join("=") : "";
+  if (!note && process.stdin.isTTY) {
+    note = await askNote();
+  }
+  if (note) {
+    await addNote(projectRoot, note);
+  }
+
+  const sessionNotes = await getNotes(projectRoot);
+
   if (await isFirstRun(projectRoot)) {
     console.error(`First synthesis for ${projectRoot} — capturing current project state ...`);
   } else {
     console.error(`Saving session checkpoint for ${projectRoot} ...`);
   }
 
-  const result = await synthesizeContext({ projectRoot });
+  const result = await synthesizeContext({ projectRoot, sessionNotes: sessionNotes ?? undefined });
 
   if (!result.success) {
     console.error(`✗ ${result.summary}`);
@@ -111,9 +135,10 @@ async function runSave(args: string[]): Promise<boolean> {
 }
 
 async function runEnd(args: string[]): Promise<void> {
-  const projectRoot = path.resolve(args[0] ?? process.cwd());
+  const pathArgs = args.filter((a) => !a.startsWith("--"));
+  const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
 
-  // Step 1: Synthesize
+  // Step 1: Synthesize (runSave handles notes prompt)
   const success = await runSave(args);
   if (!success) {
     process.exit(1);
@@ -135,6 +160,9 @@ async function runEnd(args: string[]): Promise<void> {
       console.error(`  You can commit it manually: git add .lodestar.md && git commit -m "update session context"`);
     }
   }
+
+  // Clear accumulated notes — session is over
+  await clearNotes(projectRoot);
 
   console.error(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Session ended. Context saved for next time.
