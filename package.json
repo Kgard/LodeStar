@@ -1,7 +1,7 @@
 {
   "name": "lodestar",
   "version": "0.1.0",
-  "description": "Keelson Module 00 — Session context synthesis for Claude Code",
+  "description": "Kylex Module 00 — Session context synthesis for Claude Code",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -18,7 +18,7 @@
   "keywords": [
     "mcp",
     "claude",
-    "keelson",
+    "kylex",
     "session-context"
   ],
   "author": "Titania Labs LLC",

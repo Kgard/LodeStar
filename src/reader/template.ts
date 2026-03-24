@@ -936,7 +936,7 @@ ${prd ? `
 </div><!-- end tab-requirements -->
 
 <div class="footer">
-  Lodestar &middot; Keelson Module 00 &middot; <a href="https://keelson.io">keelson.io</a>
+  Lodestar &middot; Kylex Module 00 &middot; <a href="https://kylex.io">kylex.io</a>
 </div>
 
 </div>

@@ -9,7 +9,7 @@ import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 
 const USAGE = `
-Lodestar — Keelson Module 00
+Lodestar — Kylex Module 00
 "Every session remembers where you left off."
 
 Commands:

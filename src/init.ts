@@ -18,7 +18,7 @@ import {
 
 const BANNER = `
 ╔═══════════════════════════════════════════╗
-║  Lodestar — Keelson Module 00             ║
+║  Lodestar — Kylex Module 00             ║
 ║  First-run setup                          ║
 ╚═══════════════════════════════════════════╝
 `;
@@ -391,7 +391,7 @@ Lodestar is ready.
 
 Or just tell your AI: "lodestar start" / "lodestar end"
 
-Sign up for Keelson updates: keelson.io
+Sign up for Kylex updates: kylex.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       return;
     }
@@ -470,6 +470,6 @@ Lodestar is ready.
 
 Or just tell your AI: "lodestar start" / "lodestar end"
 
-Sign up for Keelson updates: keelson.io
+Sign up for Kylex updates: kylex.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 }

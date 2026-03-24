@@ -1,6 +1,6 @@
 # Lodestar — Claude Code Build Instructions
 
-> Module 00 of the **Keelson** suite (keelson.io)  
+> Module 00 of the **Kylex** suite (kylex.io)  
 > Titania Labs LLC — Confidential  
 > Version: Phase 1a
 
@@ -35,7 +35,7 @@ If a feature idea arises that belongs to a later phase, add it to `## Future Pha
 
 | Field | Value |
 |---|---|
-| Suite | Keelson (keelson.io) |
+| Suite | Kylex (kylex.io) |
 | Product | Lodestar — Module 00 |
 | Tagline | "Every session remembers where you left off." |
 | Revenue model | Free forever — community candy, newsletter capture |
@@ -211,6 +211,26 @@ The `.lodestar.md` file renders this as structured Markdown with clear section h
 - Parse failure → return warning with raw file content so Claude can still read it
 - Do not throw — always return a usable response
 
+**Portability — how `.lodestar.md` works across machines and tools:**
+
+`lodestar_load` reads from the **local filesystem only**. It requires the binary to be installed and the MCP server to be running. This is the primary path for CLI users.
+
+However, because `.lodestar.md` is committed to Git on every synthesis, portability is already solved by the Git layer — no additional infrastructure needed:
+
+| Scenario | Path |
+|---|---|
+| Different machine, Lodestar CLI installed | `git pull` → `lodestar_load` reads local `.lodestar.md` — zero friction |
+| Different machine, no Lodestar CLI | `git pull` → open `.lodestar.md` → copy raw content → paste into chat |
+| Claude.ai web app or any web-based AI tool | GitHub repo → `.lodestar.md` → Raw button → copy URL → paste into chat — Claude fetches the content directly |
+
+**The raw URL pattern (document in README):**
+```
+https://raw.githubusercontent.com/{user}/{repo}/main/.lodestar.md
+```
+This URL works for any AI tool that can fetch a URL. For private repos, the user needs a GitHub personal access token, but the pattern is identical.
+
+**`lodestar review` implication:** The review reader must display the raw GitHub URL for the current `.lodestar.md` at the bottom of the page — formatted as a copyable link. This is the escape hatch for web app users. It requires the repo's remote URL to be read from `git remote get-url origin` and formatted accordingly. If the repo has no remote, omit this section gracefully.
+
 ---
 
 ## LLM provider abstraction
@@ -275,7 +295,7 @@ lodestar init
 
 ```
 ╔═══════════════════════════════════════════╗
-║  Lodestar — Keelson Module 00             ║
+║  Lodestar — Kylex Module 00             ║
 ║  First-run setup                          ║
 ╚═══════════════════════════════════════════╝
 
@@ -377,7 +397,9 @@ At the end of any session, run:
 At the start of any session, run:
   lodestar_load({ projectRoot: "/path/to/your/project" })
 
-Sign up for Keelson updates: keelson.io
+Get early access to Kylex Pro + build-in-public updates:
+  kylex.io → enter your email → founding member status locked
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -667,12 +689,17 @@ When `--diff` is passed and a `.lodestar.history/` file exists, the reader shows
 
 - **No external dependencies** — the served HTML is a self-contained string in `src/reader/template.ts`. No CDN imports, no Google Fonts, no external JS. The reader must work completely offline.
 - **System fonts** — use `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`. Do not import fonts.
-- **Keelson color palette** — deep navy `#1B2C4A` for headers, nautical teal `#1A6B72` for accents, brass `#C8A84B` for the Lodestar mark and section badges, warm white `#F8F9FA` background.
+- **Kylex color palette** — deep navy `#1B2C4A` for headers, nautical teal `#1A6B72` for accents, brass `#C8A84B` for the Lodestar mark and section badges, warm white `#F8F9FA` background.
 - **Dark mode aware** — use `prefers-color-scheme: dark` media query. Dark background: `#0D1117`, dark surface: `#161B22`.
 - **Readable at a glance** — minimum 16px body text, generous line height (1.6), clear section separation.
 - **One interaction per element** — click to expand/collapse. No hover-only states. No tooltips required to understand the UI.
 - **Mobile-capable** — the reader may be viewed on a phone. Max-width container (760px), responsive at 375px minimum.
-- **Keelson footer** — every reader page includes a subtle footer: `Lodestar · Keelson Module 00 · keelson.io`. This is the community candy brand impression.
+- **Kylex footer** — every reader page includes a subtle footer: `Lodestar · Kylex Module 00 · kylex.io`. This is the community candy brand impression.
+- **Portability row** — below the footer, display the raw GitHub URL for the current `.lodestar.md` as a copyable one-line element:
+  ```
+  📋 Use on another machine or web app: https://raw.githubusercontent.com/{user}/{repo}/main/.lodestar.md  [copy]
+  ```
+  Derive this URL by running `git remote get-url origin` on the project root and transforming the GitHub SSH or HTTPS remote URL into raw.githubusercontent.com format. If the repo has no GitHub remote, omit this row silently — no error, no placeholder. This is the escape hatch for users on the Claude.ai web app or a machine without Lodestar installed: paste the URL into any AI chat and the model fetches context directly. Include a small copy-to-clipboard button inline.
 
 ---
 
@@ -736,7 +763,7 @@ export function renderReaderHTML(
   historyContext: LodestarContext | null
 ): string {
   // Returns full HTML document as a string
-  // CSS variables map to Keelson palette
+  // CSS variables map to Kylex palette
   // JS handles accordion expand/collapse — vanilla only, no framework
   // Diff panel rendered only when historyContext is not null
 }
@@ -843,7 +870,23 @@ If a feature request touches Vela's domain (product intent, brief generation), P
 
 ## Context for cold starts
 
-You are building the first module of Keelson — a suite of tools for solo founders and first-time app builders. Lodestar is free forever. Its job is to build trust and audience for the suite, not to generate revenue itself. The `.lodestar.md` file it produces should be something a developer looks at and thinks "this is exactly what I needed to remember" — not a git log summary, not a diff report. A handoff note from a thoughtful colleague who watched the whole session.
+You are building the first module of Kylex — a suite of tools for solo founders and first-time app builders. The `.lodestar.md` file it produces should be something a developer looks at and thinks "this is exactly what I needed to remember" — not a git log summary, not a diff report. A handoff note from a thoughtful colleague who watched the whole session.
+
+**Distribution model: binary-only. No source code is ever released.**
+
+Lodestar is distributed as a compiled binary. Users install it and run it. They cannot inspect, fork, modify, or redistribute the implementation. This is the primary moat — not feature complexity alone, but implementation opacity. The synthesis prompt, schema design, provider abstraction, history rotation, and review UX are all protected.
+
+This has build implications:
+- Do not write code assuming it will be read by users or contributors
+- Internal variable names, comments, and architecture are private — optimise for clarity to Claude Code during build, not for public consumption
+- The binary will be signed and distributed via a controlled channel (GitHub Releases or a dedicated download page) — not npm publish
+- The `package.json` `bin` entry is for development convenience only; the shipped artifact is a compiled binary (pkg, nexe, or equivalent)
+
+**Tier model:**
+- **Lodestar Free** — Phase 1a binary: `lodestar init`, `lodestar_synthesize`, `lodestar_load`, `lodestar review`. Manual CLI only. Free forever.
+- **Kylex Pro** — Phase 1b+: background agent, auto drift detection, cross-project diffing, Kite integrated scan. Subscription.
+
+The free tier is community candy that builds the Kylex newsletter audience. The pro tier is where revenue lives. Phase 1a builds the free tier. Phase 1b+ builds the pro tier.
 
 The synthesis prompt is the core product. Get that right before optimising anything else.
 
@@ -864,35 +907,130 @@ These were open questions. They are now decided. Do not reopen them.
   Cap the combined input (git diff + status + package changes + session notes) at **6,000 tokens** before sending to the provider. If the diff exceeds this, truncate `git diff` to the most recently modified files first, then log a warning in the synthesis output noting truncation. Do not silently truncate — always surface it. For Anthropic and OpenAI, use the SDK's token counting utility. For Ollama, estimate at 4 characters per token as a fallback.
 
 - [x] **Provider-agnostic or Anthropic-only?**  
-  **Provider-agnostic.** Lodestar is community candy for the full vibe-coding audience — Claude Code, Cursor, Windsurf, and any AI coding tool. Locking to Anthropic would exclude users who don't have an Anthropic API key, costing newsletter signups and Keelson audience growth. The `LLMProvider` interface abstracts the synthesis call. Anthropic ships as the default and recommended provider. OpenAI and Ollama ship as alternatives. The synthesis prompt is identical across all providers.
+  **Provider-agnostic.** Lodestar is community candy for the full vibe-coding audience — Claude Code, Cursor, Windsurf, and any AI coding tool. Locking to Anthropic would exclude users who don't have an Anthropic API key, costing newsletter signups and Kylex audience growth. The `LLMProvider` interface abstracts the synthesis call. Anthropic ships as the default and recommended provider. OpenAI and Ollama ship as alternatives. The synthesis prompt is identical across all providers.
 
 - [x] **How does the user configure their API key?**  
   **Via `lodestar init` wizard — not via `.env` or manual file editing.** The key is stored in `~/.lodestar.config.json` in the user's home directory. It is never stored in a project repo, never passed via `mcp.json env` block, and never handled via `.env` files in production. The init wizard validates the key before saving and opens the provider's console in the browser if the user doesn't have one yet.
 
-- [x] **Does Lodestar cost Ken anything when users run synthesis?**  
-  **No.** Lodestar runs entirely on the user's machine using their own API key. Ken pays nothing per synthesis. The user's API cost per synthesis is approximately $0.01–0.05 — negligible alongside the cost of a full AI coding session. For Ollama users, the cost is zero. This model scales to any number of users at zero marginal cost to Titania Labs.
+- [x] **Open source or binary-only distribution?**  
+  **Binary-only. No source code is ever released.** The implementation moat is opacity — the synthesis prompt, schema design, provider abstraction, history rotation logic, and review UX are all protected. Users can observe the output format (`.lodestar.md` is committed to their repo and readable) but cannot inspect or fork the tool that produces it. This makes even Phase 1a defensible against cloning. The binary is compiled via `pkg` or equivalent and distributed via GitHub Releases or a dedicated download page — not npm publish.
+
+- [x] **Does Lodestar need a EULA?**  
+  **Yes — required before any binary ships.** The EULA must cover: (1) no reverse engineering or decompilation, (2) no redistribution or resale, (3) single-user licence per installation, (4) anonymous telemetry disclosure, (5) auto-update behaviour disclosure. Without a EULA, the binary is legally unprotected. A standard closed-source EULA is sufficient — this is not legally complex. Write it before the first public release.
+
+- [x] **Can Lodestar collect usage telemetry?**  
+  **Yes — anonymous telemetry is permitted and valuable.** Binary distribution makes telemetry possible in a way open source does not. Instrument: sessions per user per week, provider used, synthesis success/failure rate, which review sections are expanded, Phase 1b adoption rate. All telemetry is anonymous (no PII, no project content, no file names). Disclosed in the EULA and surfaced during `lodestar init`. Users can opt out. Data informs Phase 1b build priorities and pricing decisions.
+
+- [x] **How do users get updates?**  
+  **Auto-update check on launch via GitHub Releases API — no backend required.** On every `lodestar` command invocation, make a lightweight HTTP GET to `https://api.github.com/repos/kylex-labs/lodestar/releases/latest`. Compare the `tag_name` field against the current binary version. If newer, print a non-blocking notice: `Update available: v0.2.1 → run lodestar update`. The `lodestar update` command downloads the appropriate platform binary from the GitHub Release assets and replaces itself. **Rationale:** GitHub Releases API is zero-infrastructure, zero-cost, and trusted. No kylex.io backend required for Phase 1a. Upgrade to a dedicated endpoint in Phase 1b when telemetry infrastructure exists.
+
+---
+
+## GTM & distribution model — locked
+
+Binary-only distribution via two parallel tracks. Both deliver the same compiled binary. Neither track gates the GitHub download behind email.
+
+**Track 1 — GitHub Releases (virality track)**
+- Public repo with README, docs, changelog, issue tracker — no source code
+- Binary assets attached to each GitHub Release (macOS arm64, macOS x64, Linux x64, Windows x64)
+- No email gate — frictionless developer access
+- SHA256 checksums included on every release
+- This track drives GitHub stars, community discussion, and word of mouth
+
+**Track 2 — kylex.io (email capture track)**
+- Landing page with email input form
+- Single opt-in (not double opt-in — developer audience, lower friction)
+- GDPR checkbox on form: one line stating what they're signing up for
+- On submit: Beehiiv API call → immediate welcome email with download link
+- Welcome email delivers binary download link in the first line — no delay, no confirmation loop
+- This track drives newsletter subscribers and founding member signups
+
+**Email provider: Beehiiv**
+- Newsletter-native, clean analytics, referral program built in
+- $0 up to 2,500 subscribers
+- API available for triggered welcome emails on signup
+- Do not use Mailchimp, ConvertKit, or any other provider
+
+**Version check: GitHub Releases API**
+- GET `https://api.github.com/repos/kylex-labs/lodestar/releases/latest`
+- Compare `tag_name` against current binary version constant
+- Non-blocking notice on update available — never interrupt the user's flow
+- No kylex.io backend required for Phase 1a
+- Zero infrastructure, zero cost
+
+**Announcement sequence (at launch — not a build concern, for context):**
+1. Show HN: "Lodestar: CLI tool that synthesizes your Claude Code session into a portable .md for warm cold-starts"
+2. r/ClaudeCode and r/cursor — demo GIF or `lodestar review` screenshot
+3. Indie Hackers launch post — build-in-public angle
+4. Newsletter issue #1 to seed list
+
+**What the binary does NOT do:**
+- Never show a paywall or upsell gate in Phase 1a
+- Never require an account or login to use
+- Never phone home with session content, file names, or project data (telemetry is anonymous counters only — see telemetry decision above)
+
+---
+
+## `lodestar bootstrap` — existing codebase onboarding
+
+**Trigger:** User runs `lodestar bootstrap` on a project that has existing code but no `.lodestar.md`.
+
+**What it does:**
+Reads structural metadata from the filesystem to generate a skeleton `.lodestar.md` — without synthesizing intent, rationale, or decisions (those require a real session to exist). All unknown intent fields are explicitly marked `[UNKNOWN — fill in or run lodestar_synthesize after next session]`.
+
+**What it reads (zero hallucination risk):**
+- `package.json` / `Cargo.toml` / `pyproject.toml` — stack, dependencies, scripts
+- Directory tree (2 levels deep) — architecture pattern inference
+- `README.md` — if present, mine for stated purpose
+- Config files: `.env.example`, `tsconfig.json`, `docker-compose.yml` — deployment context
+- First 10 git commits (if repo exists) — chronological build order
+- Any `.md` files in root — docs, changelogs
+
+**What it does NOT read:** source files, implementation logic, function bodies, anything requiring code comprehension.
+
+**Hard constraint:** Bootstrap must NEVER infer intent, rationale, or architectural decisions. It only reports what objectively exists. If something is unknown, it writes `[UNKNOWN]` — not a guess.
+
+**Output header:** The generated `.lodestar.md` must include a prominent warning:
+```
+# .lodestar.md — BOOTSTRAPPED (not synthesized)
+# ⚠️ Intent fields marked [UNKNOWN] require human input.
+# Run `lodestar_synthesize` after your next session to populate them.
+```
+
+**Implementation notes:**
+- `lodestar bootstrap` is a CLI command, not an MCP tool
+- Lives in `src/bootstrap.ts`
+- Never overwrites an existing `.lodestar.md` without confirmation prompt
+- Shares the history rotation logic from `src/history.ts` if overwriting
 
 ---
 
 ## Future phases (do not build now)
 
-**Phase 1b:**
-- `lodestar_diff()` — drift detection against a reference brief or prior context
+**Phase 1b — Kylex Pro tier:**
+- Background agent — passive session watcher; fires automatically at session end; no explicit synthesize command
+- Auto drift detection — continuous comparison against original brief or prior context; surfaces contradictions without being asked
+- `lodestar_diff()` as an always-on signal, not a manual command
+- Subscription paywall — Phase 1b features are Pro-only
 
-**Phase 2:**
-- Passive background agent — watches session automatically, fires at session end
-- No explicit `lodestar_synthesize` command required
-
-**Phase 3:**
+**Phase 2 — Kylex Pro tier:**
 - Cross-project pattern diffing — compare `.lodestar.md` files across multiple projects
 - Surface recurring patterns, repeated mistakes, architectural inconsistencies
+- Portfolio-level intelligence for multi-project solo founders
 
-**Keelson suite integration (paid tier):**
-- Accept Vela brief output as drift reference
-- Surface Kite scan history in session context
-- Cross-module awareness for paid Keelson members
+**Phase 3 — Kylex Pro tier:**
+- Kite integrated scan — security scan triggered automatically before session synthesis
+- Vela brief as drift reference — accept Vela output as the authoritative intent document
+- Full Kylex suite context awareness for paid members
+
+**Binary compilation (required before public launch):**
+- Use `pkg` (Vercel) or `nexe` to compile the Node.js app to a standalone binary
+- Target: macOS arm64, macOS x64, Linux x64, Windows x64
+- Signed binary for macOS (Apple Developer ID) and Windows (code signing cert)
+- Distributed via GitHub Releases with SHA256 checksums
+- `lodestar update` command for self-updating binary
 
 ---
 
-*Lodestar — Keelson Module 00 — Titania Labs LLC*  
-*keelson.io — Free forever*
+*Lodestar — Kylex Module 00 — Titania Labs LLC*  
+*kylex.io — Binary distribution, closed source*

@@ -6,7 +6,7 @@ Lodestar solves session amnesia in AI coding tools. Every time you start a new s
 
 Lodestar synthesizes your coding session into a structured `.lodestar.md` file that lives in your project. The next time you (or your AI) open the project, that context is right there — decisions, patterns, dependencies, rejected approaches, and exactly where to pick up.
 
-> Module 00 of the [Keelson](https://keelson.io) suite by Titania Labs LLC
+> Module 00 of the [Kylex](https://kylex.io) suite by Titania Labs LLC
 > Free forever.
 
 ---
@@ -359,4 +359,4 @@ Proprietary — Titania Labs LLC
 
 ---
 
-*Lodestar is Module 00 of the [Keelson](https://keelson.io) suite. Free forever.*
+*Lodestar is Module 00 of the [Kylex](https://kylex.io) suite. Free forever.*

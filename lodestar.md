@@ -1,6 +1,6 @@
 # Lodestar — Claude Code Build Instructions
 
-> Module 00 of the **Keelson** suite (keelson.io)  
+> Module 00 of the **Kylex** suite (kylex.io)  
 > Titania Labs LLC — Confidential  
 > Version: Phase 1a
 
@@ -28,7 +28,7 @@ If a feature idea arises that belongs to a later phase, add it to `## Future Pha
 
 | Field | Value |
 |---|---|
-| Suite | Keelson (keelson.io) |
+| Suite | Kylex (kylex.io) |
 | Product | Lodestar — Module 00 |
 | Tagline | "Every session remembers where you left off." |
 | Revenue model | Free forever — community candy, newsletter capture |
@@ -357,7 +357,7 @@ If a feature request touches Vela's domain (product intent, brief generation), P
 
 ## Context for cold starts
 
-You are building the first module of Keelson — a suite of tools for solo founders and first-time app builders. Lodestar is free forever. Its job is to build trust and audience for the suite, not to generate revenue itself. The `.lodestar.md` file it produces should be something a developer looks at and thinks "this is exactly what I needed to remember" — not a git log summary, not a diff report. A handoff note from a thoughtful colleague who watched the whole session.
+You are building the first module of Kylex — a suite of tools for solo founders and first-time app builders. Lodestar is free forever. Its job is to build trust and audience for the suite, not to generate revenue itself. The `.lodestar.md` file it produces should be something a developer looks at and thinks "this is exactly what I needed to remember" — not a git log summary, not a diff report. A handoff note from a thoughtful colleague who watched the whole session.
 
 The synthesis prompt is the core product. Get that right before optimising anything else.
 
@@ -384,12 +384,12 @@ The synthesis prompt is the core product. Get that right before optimising anyth
 - Cross-project pattern diffing — compare `.lodestar.md` files across multiple projects
 - Surface recurring patterns, repeated mistakes, architectural inconsistencies
 
-**Keelson suite integration (paid tier):**
+**Kylex suite integration (paid tier):**
 - Accept Vela brief output as drift reference
 - Surface Kite scan history in session context
-- Cross-module awareness for paid Keelson members
+- Cross-module awareness for paid Kylex members
 
 ---
 
-*Lodestar — Keelson Module 00 — Titania Labs LLC*  
-*keelson.io — Free forever*
+*Lodestar — Kylex Module 00 — Titania Labs LLC*  
+*kylex.io — Free forever*
