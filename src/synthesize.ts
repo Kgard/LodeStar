@@ -10,6 +10,7 @@ import { rotateHistory } from "./history.js";
 import { contextToMarkdown, parseMarkdown, type LodestarContext } from "./schema.js";
 import { loadPromptTemplate } from "./prompt.js";
 import { verifyOpenQuestions } from "./verify-questions.js";
+import { splitDiffByFile, truncateByPriority } from "./diff-priority.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const TOKEN_BUDGET = 6000;
@@ -72,35 +73,11 @@ function buildInput(parts: {
   return lines.join("\n");
 }
 
-async function truncateDiff(
-  provider: ReturnType<typeof getProvider>,
-  diff: string,
-  budget: number
-): Promise<{ text: string; wasTruncated: boolean }> {
-  const tokens = await provider.countTokens(diff);
-  if (tokens <= budget) {
-    return { text: diff, wasTruncated: false };
-  }
-
-  const lines = diff.split("\n");
-  let lo = 0;
-  let hi = lines.length;
-  let best = 0;
-
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const candidate = lines.slice(0, mid).join("\n");
-    const t = await provider.countTokens(candidate);
-    if (t <= budget) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-
-  const truncated = lines.slice(0, best).join("\n");
-  return { text: truncated + "\n\n(truncated — exceeded token budget)", wasTruncated: true };
+interface TruncationResult {
+  truncatedDiff: string;
+  truncatedCommittedDiff: string;
+  wasTruncated: boolean;
+  excludedFiles: string[];
 }
 
 async function truncateToTokenBudget(
@@ -112,7 +89,7 @@ async function truncateToTokenBudget(
   packageChanges: string | null,
   sessionNotes: string | null,
   existingContext: string | null
-): Promise<{ truncatedDiff: string; truncatedCommittedDiff: string; wasTruncated: boolean }> {
+): Promise<TruncationResult> {
   const overhead = [commitLog, gitStatus, packageChanges ?? "", sessionNotes ?? "", existingContext ?? ""].join("\n");
   const overheadTokens = await provider.countTokens(overhead);
   const totalBudget = TOKEN_BUDGET - overheadTokens;
@@ -122,6 +99,7 @@ async function truncateToTokenBudget(
       truncatedDiff: "(diff omitted — other inputs exceed token budget)",
       truncatedCommittedDiff: "(diff omitted)",
       wasTruncated: true,
+      excludedFiles: [],
     };
   }
 
@@ -129,13 +107,23 @@ async function truncateToTokenBudget(
   const committedBudget = Math.floor(totalBudget * 0.6);
   const uncommittedBudget = totalBudget - committedBudget;
 
-  const committed = await truncateDiff(provider, committedDiff, committedBudget);
-  const uncommitted = await truncateDiff(provider, gitDiff, uncommittedBudget);
+  // Split diffs by file and sort by priority
+  const committedFiles = splitDiffByFile(committedDiff);
+  const uncommittedFiles = splitDiffByFile(gitDiff);
+
+  // Estimate tokens synchronously (provider.countTokens is async but we need sync for truncateByPriority)
+  const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
+
+  const committed = truncateByPriority(committedFiles, committedBudget, estimateTokens);
+  const uncommitted = truncateByPriority(uncommittedFiles, uncommittedBudget, estimateTokens);
+
+  const allExcluded = [...committed.excluded, ...uncommitted.excluded];
 
   return {
-    truncatedDiff: uncommitted.text,
-    truncatedCommittedDiff: committed.text,
+    truncatedDiff: uncommitted.included,
+    truncatedCommittedDiff: committed.included,
     wasTruncated: committed.wasTruncated || uncommitted.wasTruncated,
+    excludedFiles: allExcluded,
   };
 }
 
@@ -339,7 +327,7 @@ export async function synthesizeContext(
   }
 
   // Truncate diffs to token budget
-  const { truncatedDiff, truncatedCommittedDiff, wasTruncated } = await truncateToTokenBudget(
+  const { truncatedDiff, truncatedCommittedDiff, wasTruncated, excludedFiles } = await truncateToTokenBudget(
     provider,
     gitResult.diff,
     gitResult.committedDiff,
@@ -351,7 +339,10 @@ export async function synthesizeContext(
   );
 
   if (wasTruncated) {
-    warnings.push("Git diff was truncated to fit within the 6,000 token budget");
+    const excludeNote = excludedFiles.length > 0
+      ? ` Excluded: ${excludedFiles.slice(0, 5).join(", ")}${excludedFiles.length > 5 ? ` +${excludedFiles.length - 5} more` : ""}`
+      : "";
+    warnings.push(`Diff truncated by file priority.${excludeNote}`);
   }
 
   // Load prompt and build input
