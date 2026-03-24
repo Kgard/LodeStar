@@ -155,6 +155,44 @@ function treeToMermaid(tree: string): string | null {
   return deduped.join("\n");
 }
 
+const CODE_SECTIONS = new Set([
+  "tech stack", "repository structure", "the `.lodestar.md` schema",
+  "mcp tool contracts", "llm provider abstraction", "mcp server setup",
+  "configuration", "typescript config", "coding conventions",
+  "build and run", "`lodestar init`", "`lodestar review`",
+  "`lodestar bootstrap`", "the synthesis prompt",
+]);
+
+function splitByCategory(md: string): { code: string; product: string } {
+  // Split on ## headers, categorize each section
+  const sections = md.split(/(?=^## )/m);
+  const codeParts: string[] = [];
+  const productParts: string[] = [];
+
+  for (const section of sections) {
+    const headerMatch = section.match(/^## (.+)$/m);
+    if (!headerMatch) {
+      // Content before first h2 — goes to product (intro)
+      productParts.push(section);
+      continue;
+    }
+
+    const title = headerMatch[1].trim().toLowerCase();
+    // Check if any code section key is contained in the title
+    const isCode = [...CODE_SECTIONS].some((key) => title.includes(key.toLowerCase()));
+    if (isCode) {
+      codeParts.push(section);
+    } else {
+      productParts.push(section);
+    }
+  }
+
+  return {
+    code: codeParts.join("\n"),
+    product: productParts.join("\n"),
+  };
+}
+
 function markdownToHtml(md: string): string {
   // Extract code blocks BEFORE escaping to preserve special chars
   const codeBlocks: string[] = [];
@@ -180,9 +218,10 @@ function markdownToHtml(md: string): string {
   // Now escape the rest
   let html = escapeHtml(processed);
 
-  // Restore code blocks
+  // Restore code blocks — but push them to end of their section
+  // First, do all other formatting, then reorder within sections
   for (let i = 0; i < codeBlocks.length; i++) {
-    html = html.replace(`&lt;!--CODEBLOCK_${i}--&gt;`, codeBlocks[i]);
+    html = html.replace(`&lt;!--CODEBLOCK_${i}--&gt;`, `<!--CODEBLOCK_${i}-->`);
   }
 
   // Headers
@@ -209,6 +248,9 @@ function markdownToHtml(md: string): string {
   });
   // Wrap consecutive tr in table
   html = html.replace(/(<tr>[\s\S]*?<\/tr>\n?)+/g, '<table class="prd-table">$&</table>');
+  // Ordered lists
+  html = html.replace(/^\d+\.\s+(.+)$/gm, '<li class="prd-ol-item">$1</li>');
+  html = html.replace(/(<li class="prd-ol-item">[\s\S]*?<\/li>\n?)+/g, '<ol class="prd-ol">$&</ol>');
   // Unordered lists
   html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
   html = html.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, '<ul class="prd-ul">$&</ul>');
@@ -219,6 +261,27 @@ function markdownToHtml(md: string): string {
   html = '<p class="prd-p">' + html + '</p>';
   // Clean up empty paragraphs
   html = html.replace(/<p class="prd-p">\s*<\/p>/g, '');
+
+  // Reorder: within each section (between h2 tags), move code blocks after prose
+  html = html.replace(
+    /(<h2 class="prd-h2">[\s\S]*?)(?=<h2 class="prd-h2">|$)/g,
+    (section) => {
+      const blocks: string[] = [];
+      // Extract code block placeholders
+      const withoutBlocks = section.replace(/<!--CODEBLOCK_(\d+)-->/g, (_m, idx) => {
+        blocks.push(codeBlocks[parseInt(idx, 10)]);
+        return "";
+      });
+      // Append blocks at end of section
+      return withoutBlocks + blocks.join("\n");
+    }
+  );
+
+  // Restore any remaining code blocks not inside h2 sections (e.g. before first h2)
+  for (let i = 0; i < codeBlocks.length; i++) {
+    html = html.replace(`<!--CODEBLOCK_${i}-->`, codeBlocks[i]);
+  }
+
   return html;
 }
 
@@ -612,17 +675,30 @@ body {
 .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-.prd-h1 { font-size: 1.25rem; font-weight: 700; color: var(--navy); margin: 2rem 0 0.75rem; }
-.prd-h2 {
-  font-size: 0.8rem; font-weight: 600; color: var(--teal);
-  text-transform: uppercase; letter-spacing: 0.05em;
-  margin: 1.75rem 0 0.75rem; padding-bottom: 0.4rem;
-  border-bottom: 1px solid var(--border);
+.prd-h1 {
+  font-size: 1.75rem; font-weight: 700; color: var(--navy);
+  margin: 2.5rem 0 1rem; line-height: 1.2;
 }
-.prd-h3 { font-size: 0.9rem; font-weight: 600; color: var(--text); margin: 1rem 0 0.4rem; }
-.prd-p { margin: 0.4rem 0; line-height: 1.7; font-size: 0.9rem; color: var(--text); }
-.prd-ul { padding-left: 1.25rem; margin: 0.4rem 0; }
-.prd-ul li { margin: 0.25rem 0; font-size: 0.9rem; line-height: 1.6; }
+.prd-h2 {
+  font-size: 1.25rem; font-weight: 600; color: var(--navy);
+  margin: 2rem 0 0.75rem; padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border); line-height: 1.3;
+}
+.prd-h3 {
+  font-size: 1.25rem; font-weight: 600; color: var(--text);
+  margin: 1.5rem 0 0.5rem; line-height: 1.3;
+}
+h4 {
+  font-size: 1rem; font-weight: 600; color: var(--text);
+  margin: 1.25rem 0 0.4rem;
+}
+h5 { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); margin: 1rem 0 0.3rem; }
+h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.75rem 0 0.25rem; }
+.prd-p { margin: 0.5rem 0; line-height: 1.75; font-size: 0.875rem; color: var(--text); }
+.prd-ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+.prd-ul li { margin: 0.3rem 0; font-size: 0.875rem; line-height: 1.6; }
+.prd-ol { padding-left: 1.25rem; margin: 0.5rem 0; list-style: decimal; }
+.prd-ol li { margin: 0.3rem 0; font-size: 0.875rem; line-height: 1.6; }
 .prd-code { background: var(--bg); border: 1px solid var(--border); padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.82em; font-family: 'SF Mono', 'Fira Code', monospace; }
 .prd-pre {
   background: var(--surface); border: 1px solid var(--border);
@@ -692,10 +768,27 @@ body {
 }
 .prd-content {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1.5rem;
+  padding: 0;
 }
+.subtabs {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 1rem;
+}
+.subtab {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+.subtab:hover { color: var(--text); }
+.subtab.active { color: var(--teal); font-weight: 600; }
+.subtab-content { display: none; }
+.subtab-content.active { display: block; }
 .prd-wireframe {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -912,15 +1005,23 @@ ${(c.integrations ?? []).length > 0 ? `
 </div><!-- end tab-summary -->
 
 <div id="tab-requirements" class="tab-content">
-${prd ? `
-  <div class="prd-source">Source: ${escapeHtml(prd.filename)}</div>
-  <div class="prd-content">
-    ${markdownToHtml(prd.content)}
+${prd ? (() => {
+  const split = splitByCategory(prd.content);
+  return `
+  <div class="subtabs">
+    <div class="subtab active" onclick="switchSubtab('product')">Product &amp; Business</div>
+    <div class="subtab" onclick="switchSubtab('code')">Code &amp; Architecture</div>
+  </div>
+  <div id="subtab-product" class="subtab-content active">
+    <div class="prd-content"><div style="text-align:right;font-size:0.7rem;color:var(--text-muted);margin-bottom:0.75rem">Last updated: ${escapeHtml(c.meta.date)}</div>${markdownToHtml(split.product)}</div>
+  </div>
+  <div id="subtab-code" class="subtab-content">
+    <div class="prd-content"><div style="text-align:right;font-size:0.7rem;color:var(--text-muted);margin-bottom:0.75rem">Last updated: ${escapeHtml(c.meta.date)}</div>${markdownToHtml(split.code)}</div>
   </div>
   <div class="prd-future-note">
     Editing coming soon — changes will sync back to ${escapeHtml(prd.filename)}
-  </div>
-` : `
+  </div>`;
+})() : `
   <div style="padding:2rem;text-align:center;color:var(--text-muted)">
     <p>No project requirements document found.</p>
     <p style="font-size:0.85rem;margin-top:0.5rem">Create a <strong>brief.html</strong>, <strong>CLAUDE.md</strong>, or <strong>PRD.md</strong> in your project root.</p>
@@ -940,6 +1041,12 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[onclick*="' + name + '"]').classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
+}
+function switchSubtab(name) {
+  document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.subtab-content').forEach(t => t.classList.remove('active'));
+  document.querySelector('.subtab[onclick*="' + name + '"]').classList.add('active');
+  document.getElementById('subtab-' + name).classList.add('active');
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
