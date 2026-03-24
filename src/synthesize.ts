@@ -258,6 +258,49 @@ export async function synthesizeContext(
     warnings.push("No package.json changes detected");
   }
 
+  // Check if there are any meaningful changes to synthesize
+  const hasUncommitted = gitResult.diff !== "(no uncommitted changes)";
+  const hasCommitted = gitResult.committedDiff !== "(no committed changes since last synthesis)";
+  const hasChanges = hasUncommitted || hasCommitted;
+
+  if (!hasChanges) {
+    // No changes — skip LLM call, return existing context or minimal file
+    try {
+      await fs.access(filePath);
+      return {
+        success: true,
+        path: filePath,
+        summary: `No changes detected for ${projectName} — existing context is current`,
+        warnings: ["No uncommitted or committed changes since last synthesis. Skipped LLM call."],
+      };
+    } catch {
+      // No existing context and no changes — write a minimal file
+      const minimal: LodestarContext = {
+        meta: { project: projectName, date: new Date().toISOString().slice(0, 10), model: "none" },
+        projectSummary: "",
+        userSegments: [],
+        integrations: [],
+        features: [],
+        futurePhases: [],
+        diagrams: [],
+        decisions: [],
+        patterns: [],
+        dependencies: [],
+        rejected: [],
+        openQuestions: [],
+        nextSession: ["Run lodestar save after making changes to generate context."],
+      };
+      const markdown = contextToMarkdown(minimal);
+      await atomicWrite(filePath, markdown);
+      return {
+        success: true,
+        path: filePath,
+        summary: `No changes detected — wrote minimal context for ${projectName}`,
+        warnings: ["No changes found. Created a placeholder .lodestar.md."],
+      };
+    }
+  }
+
   // Read existing context if present
   let existingContext: string | null = null;
   let resolvedQuestionsNote = "";
