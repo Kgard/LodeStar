@@ -263,14 +263,14 @@ export function renderReaderHTML(
 <title>Lodestar &middot; ${escapeHtml(c.meta.project)}</title>
 <style>
 :root {
-  --navy: #1B2C4A;
-  --teal: #1A6B72;
-  --brass: #C8A84B;
-  --bg: #F8F9FA;
+  --navy: #0C447C;
+  --teal: #185FA5;
+  --brass: #185FA5;
+  --bg: #FFFFFF;
   --surface: #FFFFFF;
-  --text: #1B2C4A;
+  --text: #0C447C;
   --text-muted: #6B7280;
-  --border: #E5E7EB;
+  --border: #DCE4ED;
   --blocking: #DC2626;
   --add: #16A34A;
   --change: #D97706;
@@ -279,8 +279,8 @@ export function renderReaderHTML(
 @media (prefers-color-scheme: dark) {
   :root {
     --navy: #E2E8F0;
-    --teal: #2DD4BF;
-    --brass: #C8A84B;
+    --teal: #5B9BD5;
+    --brass: #5B9BD5;
     --bg: #0D1117;
     --surface: #161B22;
     --text: #E2E8F0;
@@ -308,7 +308,8 @@ body {
   gap: 0.75rem;
   margin-bottom: 0.25rem;
 }
-.logo { color: var(--brass); font-weight: 700; font-size: 1.25rem; }
+.logo { display: flex; align-items: center; }
+.logo svg { height: 84px; width: auto; }
 .project { font-size: 1.25rem; font-weight: 600; color: var(--navy); }
 .meta { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
 .summary {
@@ -322,22 +323,18 @@ body {
 }
 .badges {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
   margin-bottom: 1.5rem;
   flex-wrap: wrap;
+  align-items: baseline;
 }
 .badge {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.75rem 1.25rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  min-width: 90px;
+  align-items: baseline;
+  gap: 0.35rem;
 }
 .badge-count { font-size: 1.5rem; font-weight: 700; color: var(--teal); }
-.badge-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.badge-label { font-size: 0.8rem; color: var(--text-muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
 .next-preview {
   padding: 1rem;
   background: var(--surface);
@@ -350,9 +347,10 @@ body {
 .next-label { font-size: 0.75rem; color: var(--brass); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
 .section {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-bottom: 0.5rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  margin-bottom: 0;
   overflow: hidden;
 }
 .section-header {
@@ -436,19 +434,18 @@ body {
 .footer a:hover { text-decoration: underline; }
 .brief-section {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
+  border: none;
+  border-radius: 0;
+  padding: 1rem 0;
   margin-bottom: 1.5rem;
 }
 .brief-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
   margin-bottom: 0.75rem;
 }
-.brief-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--teal); font-weight: 600; }
-.brief-overall { font-size: 0.8rem; font-weight: 600; color: var(--brass); text-transform: uppercase; letter-spacing: 0.05em; }
+.brief-title { font-size: 0.9rem; text-transform: none; letter-spacing: 0; color: var(--teal); font-weight: 600; }
+.brief-overall { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); margin-top: 0.2rem; }
 .feature-grid {
   display: flex;
   flex-direction: column;
@@ -457,13 +454,11 @@ body {
 .feature-row {
   display: grid;
   grid-template-columns: 120px 1fr;
-  gap: 0 12px;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border);
+  gap: 0 24px;
+  padding: 18px 0;
   font-size: 0.9rem;
   align-items: start;
 }
-.feature-row:last-child { border-bottom: none; }
 .feature-left {
   display: flex;
   flex-direction: column;
@@ -482,7 +477,7 @@ body {
   text-align: center;
 }
 .status-complete { background: var(--add); color: white; }
-.status-in-progress { background: var(--change); color: white; }
+.status-in-progress { background: transparent; color: var(--teal); border: 1px solid var(--teal); font-weight: 500; }
 .status-not-started { background: var(--border); color: var(--text-muted); }
 .feature-progress {
   display: flex;
@@ -723,10 +718,8 @@ body {
 <div class="container">
 
 <div class="header">
-  <span class="logo">&#9733; Lodestar</span>
-  <span class="project">${escapeHtml(c.meta.project)}</span>
+  <span class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 72" width="130" height="36"><path d="M28,8 L29.9,41.1 L43,44 L29.9,46.9 L28,58 L26.1,46.9 L15,44 L26.1,41.1 Z" fill="#185FA5"/><text x="55" y="50" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="32" font-weight="500" letter-spacing="0.5" fill="#0C447C">Lodestar</text></svg></span>
 </div>
-<div class="meta">Session: ${escapeHtml(c.meta.date)} &middot; ${escapeHtml(c.meta.model)}${c.meta.sessionDuration ? ` &middot; ${escapeHtml(c.meta.sessionDuration)}` : ""}</div>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('summary')">Project Summary</div>
@@ -744,11 +737,11 @@ ${featureCount > 0 ? `
 <div class="brief-section">
   <div class="brief-header">
     <span class="brief-title">Project Brief Status</span>
-    <span class="brief-overall">${overallPercent}% COMPLETE</span>
+    <span class="brief-overall">${overallPercent}% Complete</span>
   </div>
   <div class="feature-grid">
   ${(c.features ?? []).map((f) => {
-    const barColor = f.status === "complete" ? "var(--add)" : f.status === "in-progress" ? "var(--change)" : "var(--border)";
+    const barColor = f.status === "complete" ? "var(--add)" : f.status === "in-progress" ? "var(--add)" : "var(--border)";
     const statusClass = f.status === "complete" ? "status-complete" : f.status === "in-progress" ? "status-in-progress" : "status-not-started";
     const statusLabel = f.status === "complete" ? "Done" : f.status === "in-progress" ? "In Progress" : "Not Started";
     return `
@@ -763,42 +756,6 @@ ${featureCount > 0 ? `
       <span class="feature-name">${escapeHtml(f.feature)}${f.notes ? `<br><span class="feature-notes">${escapeHtml(f.notes)}</span>` : ""}</span>
     </div>`;
   }).join("")}
-  </div>
-</div>
-` : ""}
-
-${(c.diagrams ?? []).length > 0 ? `
-<div class="section open">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span><span class="arrow">&#9656;</span> Architecture & Flows</span>
-    <span class="section-badge">${(c.diagrams ?? []).length}</span>
-  </div>
-  <div class="section-body">
-    ${(c.diagrams ?? []).map((d, i) => `
-    <div class="diagram-container">
-      <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
-      <div class="mermaid-diagram">
-        <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
-        <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
-      </div>
-    </div>`).join("")}
-  </div>
-</div>
-` : ""}
-
-${(c.futurePhases ?? []).length > 0 ? `
-<div class="section">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span><span class="arrow">&#9656;</span> Future Phases</span>
-    <span class="section-badge">${(c.futurePhases ?? []).length}</span>
-  </div>
-  <div class="section-body">
-    ${(c.futurePhases ?? []).map((p) => `
-    <div class="roadmap-phase">
-      <div class="roadmap-phase-title">${escapeHtml(p.phase)}</div>
-      ${p.description ? `<div class="roadmap-phase-desc">${escapeHtml(p.description)}</div>` : ""}
-      ${p.items.length > 0 ? `<ul class="roadmap-items">${p.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : ""}
-    </div>`).join("")}
   </div>
 </div>
 ` : ""}
@@ -883,6 +840,42 @@ ${(c.futurePhases ?? []).length > 0 ? `
   </div>
 </div>
 
+${(c.diagrams ?? []).length > 0 ? `
+<div class="section">
+  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+    <span><span class="arrow">&#9656;</span> Architecture & Flows</span>
+    <span class="section-badge">${(c.diagrams ?? []).length}</span>
+  </div>
+  <div class="section-body">
+    ${(c.diagrams ?? []).map((d, i) => `
+    <div class="diagram-container">
+      <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
+      <div class="mermaid-diagram">
+        <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
+        <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
+      </div>
+    </div>`).join("")}
+  </div>
+</div>
+` : ""}
+
+${(c.futurePhases ?? []).length > 0 ? `
+<div class="section">
+  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+    <span><span class="arrow">&#9656;</span> Future Phases</span>
+    <span class="section-badge">${(c.futurePhases ?? []).length}</span>
+  </div>
+  <div class="section-body">
+    ${(c.futurePhases ?? []).map((p) => `
+    <div class="roadmap-phase">
+      <div class="roadmap-phase-title">${escapeHtml(p.phase)}</div>
+      ${p.description ? `<div class="roadmap-phase-desc">${escapeHtml(p.description)}</div>` : ""}
+      ${p.items.length > 0 ? `<ul class="roadmap-items">${p.items.map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : ""}
+    </div>`).join("")}
+  </div>
+</div>
+` : ""}
+
 </div><!-- end summary-main -->
 
 <div class="summary-sidebar">
@@ -936,6 +929,7 @@ ${prd ? `
 </div><!-- end tab-requirements -->
 
 <div class="footer">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 72" width="14" height="28" style="vertical-align:middle;margin-right:4px"><path d="M28,8 L29.9,41.1 L43,44 L29.9,46.9 L28,58 L26.1,46.9 L15,44 L26.1,41.1 Z" fill="#185FA5" opacity="0.4"/></svg>
   Lodestar &middot; Kylex Module 00 &middot; <a href="https://kylex.io">kylex.io</a>
 </div>
 
