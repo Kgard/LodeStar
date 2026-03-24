@@ -17,6 +17,8 @@ Commands:
   lodestar save [path]             Save a mid-session checkpoint
   lodestar end [path]              End session — synthesize + commit
   lodestar review [path] [--diff]  Open session context in the browser
+  lodestar hooks [path]            Install git hooks (auto-save on commit, full sync on push)
+  lodestar hooks --remove [path]   Remove git hooks
 
   lodestar init                    First-time setup (provider + API key)
   lodestar help                    Show this message
@@ -70,7 +72,19 @@ async function runStart(args: string[]): Promise<void> {
 }
 
 async function runSave(args: string[]): Promise<boolean> {
-  const projectRoot = path.resolve(args[0] ?? process.cwd());
+  const isQuick = args.includes("--quick");
+  const pathArgs = args.filter((a) => !a.startsWith("--"));
+  const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
+
+  if (isQuick) {
+    // Quick mode: update feature status from recent commit, no LLM call
+    const { quickUpdate } = await import("./quick-update.js");
+    const result = await quickUpdate(projectRoot);
+    if (result.updated) {
+      console.error(`✓ Quick update: ${result.summary}`);
+    }
+    return result.updated;
+  }
 
   if (await isFirstRun(projectRoot)) {
     console.error(`First synthesis for ${projectRoot} — capturing current project state ...`);
@@ -149,6 +163,20 @@ async function main(): Promise<void> {
     case "end":
       await runEnd(args);
       break;
+    case "hooks": {
+      const { installHooks, removeHooks } = await import("./hooks.js");
+      const projectRoot = path.resolve(args.filter((a) => !a.startsWith("--"))[0] ?? process.cwd());
+      if (args.includes("--remove")) {
+        await removeHooks(projectRoot);
+        console.error("✓ Lodestar git hooks removed");
+      } else {
+        const results = await installHooks(projectRoot);
+        for (const r of results) {
+          console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
+        }
+      }
+      break;
+    }
     case "review": {
       const { runReview } = await import("./review.js");
       const showDiff = args.includes("--diff");

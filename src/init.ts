@@ -382,6 +382,19 @@ export async function runInit(): Promise<void> {
       console.error(`\n✓ Keeping existing config\n`);
       await setupToolIntegration();
       await offerFirstSynthesize();
+
+      const wantsHooks = await confirm({
+        message: "Install git hooks? (auto-updates on commit, full synthesis on push)",
+        default: true,
+      });
+      if (wantsHooks) {
+        const { installHooks } = await import("./hooks.js");
+        const results = await installHooks(process.cwd());
+        for (const r of results) {
+          console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
+        }
+      }
+
       console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Lodestar is ready.
 
@@ -460,6 +473,21 @@ Sign up for Kylex updates: kylex.io
 
   // Offer first synthesis on an active project
   await offerFirstSynthesize();
+
+  // Offer git hooks
+  const wantsHooks = await confirm({
+    message: "Install git hooks? (auto-updates on commit, full synthesis on push)",
+    default: true,
+  });
+
+  if (wantsHooks) {
+    const { installHooks } = await import("./hooks.js");
+    const hookRoot = process.cwd();
+    const results = await installHooks(hookRoot);
+    for (const r of results) {
+      console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
+    }
+  }
 
   console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Lodestar is ready.
