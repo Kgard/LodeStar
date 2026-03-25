@@ -769,6 +769,34 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
   overflow: auto;
 }
 .diagram-overlay-content svg { max-width: 100%; max-height: 100%; height: auto; }
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  opacity: 0.5;
+  pointer-events: none;
+}
+.refresh-btn.active {
+  opacity: 1;
+  pointer-events: auto;
+  color: var(--teal);
+  border-color: var(--teal);
+  animation: pulse 2s infinite;
+}
+.refresh-btn.active:hover { background: var(--teal); color: white; }
+.refresh-icon { font-size: 0.75rem; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(24,95,165,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(24,95,165,0); }
+}
 .mermaid-fallback {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.8rem;
@@ -931,7 +959,10 @@ ${featureCount > 0 ? `
       <span class="brief-title">Build Status</span>
       <span class="brief-overall" style="margin-left:0.75rem">${overallPercent}% Complete</span>
     </div>
-    <span style="font-size:0.7rem;color:var(--text-muted)">Last updated: ${escapeHtml(c.meta.date)}</span>
+    <span style="display:flex;align-items:center;gap:0.5rem">
+      <span style="font-size:0.7rem;color:var(--text-muted)">Last updated: ${escapeHtml(c.meta.date)}</span>
+      <button class="refresh-btn" id="refresh-btn" onclick="location.reload()"><span class="refresh-icon">&#x21bb;</span> Refresh</button>
+    </span>
   </div>
   <div class="feature-grid">
   ${(c.features ?? []).map((f) => {
@@ -1174,6 +1205,23 @@ function switchTab(name) {
   document.querySelector('.tab[onclick*="' + name + '"]').classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
 }
+// Monitor .lodestar.md for changes
+(function() {
+  var lastMtime = 0;
+  var btn = document.getElementById('refresh-btn');
+  if (!btn) return;
+  // Get initial mtime
+  fetch('/check').then(function(r){return r.json()}).then(function(d){lastMtime=d.mtime});
+  // Poll every 5 seconds
+  setInterval(function() {
+    fetch('/check').then(function(r){return r.json()}).then(function(d){
+      if (lastMtime > 0 && d.mtime > lastMtime) {
+        btn.classList.add('active');
+      }
+    }).catch(function(){});
+  }, 5000);
+})();
+
 function enlargeDiagram(el) {
   var svg = el.querySelector('svg');
   if (!svg) return;

@@ -91,19 +91,22 @@ export async function runReview(options: {
     }
   }
 
-  const context = await readContext(resolved);
-  const historyContext = options.showDiff
-    ? await readLatestHistory(resolved)
-    : null;
-  const prd = await readPrd(resolved);
-  const briefHtml = await readBriefHtml(resolved);
+  const showDiff = options.showDiff;
 
-  const html = renderReaderHTML(context, historyContext, prd, briefHtml);
+  async function generateHtml(): Promise<string> {
+    const context = await readContext(resolved);
+    const historyContext = showDiff
+      ? await readLatestHistory(resolved)
+      : null;
+    const prd = await readPrd(resolved);
+    const briefHtml = await readBriefHtml(resolved);
+    return renderReaderHTML(context, historyContext, prd, briefHtml);
+  }
 
-  // Serve via HTTP — required for Mermaid CDN to load (file:// blocks network requests)
+  // Serve via HTTP — regenerates HTML on each request for fresh data
   let idleTimer: ReturnType<typeof setTimeout>;
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       console.error("Lodestar reader: idle timeout, shutting down.");
@@ -111,13 +114,29 @@ export async function runReview(options: {
       process.exit(0);
     }, IDLE_TIMEOUT_MS);
 
+    const html = await generateHtml();
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
 
-    if (req.url === "/brief" && briefHtml) {
-      res.end(briefHtml);
-    } else {
-      res.end(html);
+    if (req.url === "/check") {
+      try {
+        const stat = await fs.stat(path.join(resolved, LODESTAR_FILENAME));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ mtime: stat.mtimeMs }));
+      } catch {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ mtime: 0 }));
+      }
+      return;
     }
+
+    if (req.url === "/brief") {
+      const brief = await readBriefHtml(resolved);
+      if (brief) {
+        res.end(brief);
+        return;
+      }
+    }
+    res.end(html);
   });
 
   const port = (await tryPort(PREFERRED_PORT)) ? PREFERRED_PORT : 0;
