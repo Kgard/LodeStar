@@ -742,7 +742,31 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
   padding: 1rem;
   overflow-x: auto;
   text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
 }
+.mermaid-diagram:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.diagram-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.diagram-overlay-content {
+  background: var(--surface);
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow: auto;
+}
+.diagram-overlay-content svg { max-width: 100%; max-height: 100%; height: auto; }
 .mermaid-fallback {
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 0.8rem;
@@ -797,6 +821,42 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
   margin: 0.75rem 0;
   overflow-x: auto;
 }
+.pro-placeholder {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 0.75rem;
+  position: relative;
+  opacity: 0.6;
+}
+.pro-placeholder-content {
+  filter: blur(2px);
+  pointer-events: none;
+  user-select: none;
+}
+.pro-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--teal);
+  background: var(--bg);
+  border: 1px solid var(--teal);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+.pro-upgrade-link {
+  display: block;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--teal);
+  margin-top: 0.75rem;
+  text-decoration: none;
+}
+.pro-upgrade-link:hover { text-decoration: underline; }
 .prd-wireframe pre {
   font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
   font-size: 0.72rem;
@@ -816,6 +876,7 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('summary')">Project Summary</div>
+  <div class="tab" onclick="switchTab('history')">Project History</div>
   <div class="tab" onclick="switchTab('requirements')">Project Requirements</div>
 </div>
 
@@ -860,14 +921,120 @@ ${featureCount > 0 ? `
   <div class="badge"><span class="badge-count" ${blockingCount > 0 ? 'style="color:var(--blocking)"' : ""}>${questionCount}</span><span class="badge-label">Questions</span></div>
 </div>
 
-<!-- Level 2 -->
-<div class="section">
+<!-- Pro feature placeholders -->
+<div style="margin-bottom:1.5rem">
+  <div class="pro-placeholder">
+    <span class="pro-badge">Pro</span>
+    <div style="font-size:0.8rem;font-weight:600;color:var(--teal);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.05em">Session History Timeline</div>
+    <div class="pro-placeholder-content">
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <div style="height:6px;flex:1;background:var(--border);border-radius:3px"></div>
+        <div style="height:6px;flex:1;background:var(--border);border-radius:3px"></div>
+        <div style="height:6px;flex:1;background:var(--teal);border-radius:3px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-muted);margin-top:0.25rem">
+        <span>Mar 10</span><span>Mar 17</span><span>Today</span>
+      </div>
+    </div>
+    <a href="https://kylex.io" class="pro-upgrade-link">Upgrade to Pro — 30 days of session history</a>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:0.75rem">
+    <div class="pro-placeholder">
+      <span class="pro-badge">Pro</span>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--teal);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.05em">Session Diff</div>
+      <div class="pro-placeholder-content">
+        <div style="font-size:0.65rem;color:var(--text-muted)">+ 2 decisions<br>- 1 question resolved</div>
+      </div>
+    </div>
+    <div class="pro-placeholder">
+      <span class="pro-badge">Pro</span>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--teal);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.05em">Linked Projects</div>
+      <div class="pro-placeholder-content">
+        <div style="font-size:0.65rem;color:var(--text-muted)">View all related projects in one workspace dashboard</div>
+      </div>
+    </div>
+    <div class="pro-placeholder">
+      <span class="pro-badge">Pro</span>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--teal);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.05em">Team Sharing</div>
+      <div class="pro-placeholder-content">
+        <div style="font-size:0.65rem;color:var(--text-muted)">Share a link to this project dashboard</div>
+      </div>
+    </div>
+    <div class="pro-placeholder">
+      <span class="pro-badge">Pro</span>
+      <div style="font-size:0.75rem;font-weight:600;color:var(--teal);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.05em">AI Summary</div>
+      <div class="pro-placeholder-content">
+        <div style="font-size:0.65rem;color:var(--text-muted)">What changed across your last 5 sessions</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+${(c.diagrams ?? []).length > 0 ? `
+<div class="section open">
+  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+    <span><span class="arrow">&#9656;</span> Architecture & Flows</span>
+    <span class="section-badge">${(c.diagrams ?? []).length}</span>
+  </div>
+  <div class="section-body">
+    ${(c.diagrams ?? []).map((d, i) => `
+    <div class="diagram-container">
+      <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
+      <div class="mermaid-diagram" onclick="enlargeDiagram(this)">
+        <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
+        <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
+      </div>
+    </div>`).join("")}
+  </div>
+</div>
+` : ""}
+
+
+</div><!-- end summary-main -->
+
+<div class="summary-sidebar">
+${c.projectSummary ? `
+  <div class="sidebar-section">
+    <div class="sidebar-title">Project Overview</div>
+    <div class="sidebar-text">${escapeHtml(c.projectSummary)}</div>
+    ${(c.userSegments ?? []).length > 0 ? `
+    <div style="margin-top:0.5rem">
+      ${(c.userSegments ?? []).map((s) => `<span class="sidebar-tag">${escapeHtml(s)}</span>`).join("")}
+    </div>` : ""}
+  </div>
+` : ""}
+${(c.integrations ?? []).length > 0 ? `
+  <div class="sidebar-section">
+    <div class="sidebar-title">Integrations</div>
+    ${(c.integrations ?? []).map((i) => `
+    <div class="sidebar-integration">
+      <span class="sidebar-integration-name">${escapeHtml(i.name)}</span>
+      <span class="sidebar-integration-cat">${escapeHtml(i.category)}</span>
+    </div>`).join("")}
+  </div>
+` : ""}
+  <div class="sidebar-section">
+    <div class="sidebar-title">Session</div>
+    <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">
+      ${escapeHtml(c.meta.date)}<br>
+      ${escapeHtml(c.meta.model)}${c.meta.sessionDuration ? `<br>${escapeHtml(c.meta.sessionDuration)}` : ""}
+    </div>
+  </div>
+</div><!-- end summary-sidebar -->
+
+</div><!-- end summary-layout -->
+</div><!-- end tab-summary -->
+
+<div id="tab-history" class="tab-content">
+
+<div class="section open">
   <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
     <span><span class="arrow">&#9656;</span> Decisions</span>
     <span class="section-badge">${decisionCount}</span>
   </div>
   <div class="section-body">
-    ${c.decisions.map((d) => `
+    ${c.decisions.length === 0 ? '<div class="item">No decisions recorded.</div>' : c.decisions.map((d) => `
     <div class="decision">
       <div class="decision-title">${escapeHtml(d.decision)}</div>
       <div class="decision-rationale">${escapeHtml(d.rationale)}</div>
@@ -890,7 +1057,6 @@ ${featureCount > 0 ? `
   </div>
 </div>
 
-<!-- Level 3 -->
 <div class="section">
   <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
     <span><span class="arrow">&#9656;</span> Patterns</span>
@@ -933,25 +1099,6 @@ ${featureCount > 0 ? `
   </div>
 </div>
 
-${(c.diagrams ?? []).length > 0 ? `
-<div class="section">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span><span class="arrow">&#9656;</span> Architecture & Flows</span>
-    <span class="section-badge">${(c.diagrams ?? []).length}</span>
-  </div>
-  <div class="section-body">
-    ${(c.diagrams ?? []).map((d, i) => `
-    <div class="diagram-container">
-      <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
-      <div class="mermaid-diagram">
-        <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
-        <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
-      </div>
-    </div>`).join("")}
-  </div>
-</div>
-` : ""}
-
 ${(c.futurePhases ?? []).length > 0 ? `
 <div class="section">
   <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
@@ -969,40 +1116,7 @@ ${(c.futurePhases ?? []).length > 0 ? `
 </div>
 ` : ""}
 
-</div><!-- end summary-main -->
-
-<div class="summary-sidebar">
-${c.projectSummary ? `
-  <div class="sidebar-section">
-    <div class="sidebar-title">Project Overview</div>
-    <div class="sidebar-text">${escapeHtml(c.projectSummary)}</div>
-    ${(c.userSegments ?? []).length > 0 ? `
-    <div style="margin-top:0.5rem">
-      ${(c.userSegments ?? []).map((s) => `<span class="sidebar-tag">${escapeHtml(s)}</span>`).join("")}
-    </div>` : ""}
-  </div>
-` : ""}
-${(c.integrations ?? []).length > 0 ? `
-  <div class="sidebar-section">
-    <div class="sidebar-title">Integrations</div>
-    ${(c.integrations ?? []).map((i) => `
-    <div class="sidebar-integration">
-      <span class="sidebar-integration-name">${escapeHtml(i.name)}</span>
-      <span class="sidebar-integration-cat">${escapeHtml(i.category)}</span>
-    </div>`).join("")}
-  </div>
-` : ""}
-  <div class="sidebar-section">
-    <div class="sidebar-title">Session</div>
-    <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">
-      ${escapeHtml(c.meta.date)}<br>
-      ${escapeHtml(c.meta.model)}${c.meta.sessionDuration ? `<br>${escapeHtml(c.meta.sessionDuration)}` : ""}
-    </div>
-  </div>
-</div><!-- end summary-sidebar -->
-
-</div><!-- end summary-layout -->
-</div><!-- end tab-summary -->
+</div><!-- end tab-history -->
 
 <div id="tab-requirements" class="tab-content">
 ${prd ? (() => {
@@ -1041,6 +1155,26 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelector('.tab[onclick*="' + name + '"]').classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
+}
+function enlargeDiagram(el) {
+  var svg = el.querySelector('svg');
+  if (!svg) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'diagram-overlay';
+  overlay.onclick = function() { overlay.remove(); };
+  var content = document.createElement('div');
+  content.className = 'diagram-overlay-content';
+  content.innerHTML = svg.outerHTML;
+  var enlarged = content.querySelector('svg');
+  if (enlarged) {
+    enlarged.style.width = '100%';
+    enlarged.style.maxWidth = '90vw';
+    enlarged.style.height = 'auto';
+    enlarged.removeAttribute('width');
+    enlarged.removeAttribute('height');
+  }
+  overlay.appendChild(content);
+  document.body.appendChild(overlay);
 }
 function switchSubtab(name) {
   document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));

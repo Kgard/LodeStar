@@ -1132,6 +1132,7 @@ Reads structural metadata from the filesystem to generate a skeleton `.lodestar.
 **Phase 2 — Pro growth:**
 - Background agent — passive session watcher; fires lodestar_synthesize automatically at session end; no explicit command needed
 - Multi-project dashboard — cross-project pattern view on kylex.io Pro portal
+- Project linking — associate related projects (e.g. frontend + backend + landing page) into a workspace, view all linked project status in one dashboard
 - Shareable .lodestar.md URL — cloud-hosted permalink, no GitHub required
 - Haiku prompt engineering — target: all-Haiku synthesis passing the rationale test across 10 sessions. Migration gate: every `decisions[].rationale` answers *why*, at least one `rejected[]` detected per session with deleted code.
 - Telemetry dashboard — anonymised usage data (sessions/week, provider split, section expansion rates) informing Phase 3 priorities
