@@ -926,7 +926,7 @@ ${diffHtml}
 ${featureCount > 0 ? `
 <div class="brief-section">
   <div class="brief-header">
-    <span class="brief-title">Project Brief Status</span>
+    <span class="brief-title">Build Status</span>
     <span class="brief-overall">${overallPercent}% Complete</span>
   </div>
   <div class="feature-grid">
