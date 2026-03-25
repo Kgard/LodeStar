@@ -136,6 +136,41 @@ async function addToToolConfig(tool: CodingTool): Promise<{ success: boolean; me
   return { success: true, message: `Added Lodestar to ${tool.name}` };
 }
 
+const CURSOR_RULES = `# Lodestar — Session Context
+
+This project uses Lodestar for session context management. A .lodestar.md file in the project root contains decisions, patterns, and open questions from previous coding sessions.
+
+## At the start of every session
+Call lodestar_load with projectRoot set to the workspace root. Read the returned context to understand what was decided previously.
+
+## At the end of every session
+Call lodestar_synthesize with projectRoot set to the workspace root. Include any notes the user mentions in sessionNotes.
+
+## Key commands
+- "lodestar start" / "load context" → call lodestar_load
+- "lodestar save" / "save session" → call lodestar_synthesize
+- "lodestar end" / "end session" → call lodestar_synthesize
+
+## Rules
+- Always use the workspace root as projectRoot
+- Don't modify .lodestar.md directly — only Lodestar writes to it
+`;
+
+async function writeCursorRules(projectRoot: string): Promise<void> {
+  const rulesPath = path.join(projectRoot, ".cursorrules");
+  try {
+    await fs.access(rulesPath);
+    // File exists — check if it already has Lodestar
+    const existing = await fs.readFile(rulesPath, "utf-8");
+    if (existing.includes("Lodestar")) return;
+    // Append
+    await fs.writeFile(rulesPath, existing.trimEnd() + "\n\n" + CURSOR_RULES, "utf-8");
+  } catch {
+    // Doesn't exist — create
+    await fs.writeFile(rulesPath, CURSOR_RULES, "utf-8");
+  }
+}
+
 async function setupToolIntegration(): Promise<void> {
   const installed = await detectInstalledTools();
 
@@ -160,13 +195,27 @@ async function setupToolIntegration(): Promise<void> {
   }
 
   console.error("");
+  let cursorSelected = false;
   for (const tool of selected) {
     try {
       const result = await addToToolConfig(tool);
       console.error(`✓ ${result.message}`);
+      if (tool.name.toLowerCase().includes("cursor")) {
+        cursorSelected = true;
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error(`✗ Failed to configure ${tool.name}: ${message}`);
+    }
+  }
+
+  // Write .cursorrules if Cursor was selected
+  if (cursorSelected) {
+    try {
+      await writeCursorRules(process.cwd());
+      console.error(`✓ Added .cursorrules for Cursor AI context`);
+    } catch {
+      // Non-blocking
     }
   }
   console.error("");

@@ -20,17 +20,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "lodestar_synthesize",
       description:
-        "Synthesize the current coding session into a .lodestar.md context file. Captures decisions, patterns, rejected approaches, and open questions from git diffs. Call this at the end of a session. projectRoot defaults to the current working directory if not provided.",
+        "Synthesize the current coding session into a .lodestar.md context file. Captures decisions, patterns, rejected approaches, and open questions from git diffs. Call this when the user says 'lodestar save', 'lodestar end', 'save session', 'synthesize', or 'end session'. projectRoot should be the workspace root directory.",
       inputSchema: {
         type: "object" as const,
         properties: {
           projectRoot: {
             type: "string",
-            description: "Absolute path to the project directory. Defaults to current working directory if omitted.",
+            description: "Absolute path to the project directory. Use the workspace root. Defaults to current working directory if omitted.",
           },
           sessionNotes: {
             type: "string",
-            description: "Optional freeform notes from the developer about the session",
+            description: "Optional freeform notes from the developer about the session. Pass any context the user mentions about what they worked on.",
           },
         },
       },
@@ -38,20 +38,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "lodestar_load",
       description:
-        "Load session context from .lodestar.md for this project. Returns decisions, patterns, open questions, and next-session guidance from the previous session. Call this at the start of a session to warm-start. projectRoot defaults to the current working directory if not provided.",
+        "Load session context from .lodestar.md for this project. Returns decisions, patterns, open questions, and next-session guidance from the previous session. Call this when the user says 'lodestar start', 'lodestar load', 'load context', 'what did we work on last', or at the start of a new session. projectRoot should be the workspace root directory.",
       inputSchema: {
         type: "object" as const,
         properties: {
           projectRoot: {
             type: "string",
-            description: "Absolute path to the project directory. Defaults to current working directory if omitted.",
+            description: "Absolute path to the project directory. Use the workspace root. Defaults to current working directory if omitted.",
           },
         },
       },
     },
     {
       name: "lodestar_diff",
-      description: "Phase 1b — not yet implemented.",
+      description: "Compare current session context against a previous session. Phase 1b — not yet implemented.",
       inputSchema: {
         type: "object" as const,
         properties: {

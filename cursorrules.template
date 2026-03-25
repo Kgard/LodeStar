@@ -1,0 +1,23 @@
+# Lodestar — Session Context for Cursor
+
+This project uses Lodestar for session context management. A `.lodestar.md` file in the project root contains decisions, patterns, and open questions from previous coding sessions.
+
+## At the start of every session
+Call `lodestar_load` with projectRoot set to the workspace root. Read the returned context to understand what was decided, what patterns are established, and where the previous session left off.
+
+## At the end of every session
+Call `lodestar_synthesize` with projectRoot set to the workspace root. Include any notes the user mentions about what they worked on in the sessionNotes parameter.
+
+## During the session
+If the user says "lodestar save" or "save checkpoint", call `lodestar_synthesize` to capture mid-session progress.
+
+## Key commands the user may say
+- "lodestar start" or "load context" → call lodestar_load
+- "lodestar save" or "save session" → call lodestar_synthesize
+- "lodestar end" or "end session" → call lodestar_synthesize
+- "what did we work on last" → call lodestar_load and summarize
+
+## Important
+- Always use the workspace root as projectRoot
+- The .lodestar.md file is committed to git — it's part of the project
+- Don't modify .lodestar.md directly — only Lodestar writes to it
