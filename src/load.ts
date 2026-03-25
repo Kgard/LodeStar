@@ -3,6 +3,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { parseMarkdown, type LodestarContext } from "./schema.js";
+import { bootstrap } from "./bootstrap.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 
@@ -22,13 +23,29 @@ export async function load(projectRoot: string): Promise<LoadResult> {
   try {
     raw = await fs.readFile(filePath, "utf-8");
   } catch {
-    return {
-      success: true,
-      context: null,
-      summary:
-        "No .lodestar.md found. Run 'lodestar save' to create context for this project, or 'lodestar bootstrap' to capture your existing project structure.",
-      path: filePath,
-    };
+    // No .lodestar.md — auto-bootstrap if project has code
+    console.error("No .lodestar.md found — bootstrapping project...");
+    const bootstrapResult = await bootstrap(resolved);
+    if (bootstrapResult.success) {
+      console.error(`✓ ${bootstrapResult.summary}`);
+      try {
+        raw = await fs.readFile(filePath, "utf-8");
+      } catch {
+        return {
+          success: true,
+          context: null,
+          summary: "Bootstrapped project but could not read the generated file.",
+          path: filePath,
+        };
+      }
+    } else {
+      return {
+        success: true,
+        context: null,
+        summary: "No .lodestar.md found and bootstrap failed. Run 'lodestar save' after making changes.",
+        path: filePath,
+      };
+    }
   }
 
   const warnings: string[] = [];
