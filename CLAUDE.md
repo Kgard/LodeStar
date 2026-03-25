@@ -38,7 +38,7 @@ If a feature idea arises that belongs to a later phase, add it to `## Future Pha
 | Suite | Kylex (kylex.io) |
 | Product | Lodestar — Module 00 |
 | Tagline | "Every session remembers where you left off." |
-| Revenue model | Free forever — community candy, newsletter capture |
+| Revenue model | Free tier: BYOK, single-project, manual CLI — community candy, newsletter capture. Pro tier: $9.99/month — Kylex-hosted synthesis, mid-session checkpoints, session diff, 30-day history, 200 calls/month included. |
 | Primary user | Solo vibe-coding founders using Claude Code, Cursor, Windsurf, or any AI coding tool |
 | Owner | Ken / Titania Labs LLC |
 
@@ -78,7 +78,10 @@ lodestar/
 │       ├── index.ts              ← LLMProvider interface + factory
 │       ├── anthropic.ts          ← Anthropic implementation (default)
 │       ├── openai.ts             ← OpenAI implementation
-│       └── ollama.ts             ← Ollama local implementation
+│       ├── ollama.ts             ← Ollama local implementation
+│       └── kylex.ts              ← KylexHostedProvider — routes to hosted synthesis proxy (Phase 1b)
+│   ├── auth.ts                   ← JWT token validation for Pro tier (Phase 1b)
+│   ├── checkpoint.ts             ← lodestar_checkpoint() MCP tool (Phase 1b)
 ├── src/reader/
 │   └── template.ts               ← Self-contained HTML reader (inline string, no external deps)
 ├── prompts/
@@ -211,6 +214,43 @@ The `.lodestar.md` file renders this as structured Markdown with clear section h
 - Parse failure → return warning with raw file content so Claude can still read it
 - Do not throw — always return a usable response
 
+---
+
+### `lodestar_checkpoint`
+
+**Phase 1b — Pro tier only. Requires valid Kylex Pro token.**
+
+```typescript
+// Input
+{
+  projectRoot: string;     // absolute path to project directory
+  note?: string;           // optional developer note for this checkpoint
+}
+
+// Output
+{
+  success: boolean;
+  context: Partial<LodestarContext>;  // in-memory only — does NOT write .lodestar.md
+  summary: string;         // "Checkpoint: X decisions captured, Y files changed so far"
+  warnings?: string[];
+}
+```
+
+**What it does internally:**
+1. Runs `git diff HEAD` on `projectRoot` (partial diff — session in progress)
+2. Routes to KylexHostedProvider (Haiku 4.5) — validates Pro token first
+3. Returns partial `LodestarContext` — in-memory only
+4. Does NOT rotate history. Does NOT write `.lodestar.md`.
+5. Output is surfaced in `lodestar review` as an "in-progress" overlay above the committed context
+
+**Error handling:**
+- No Pro token → return structured error: `{ success: false, error: "lodestar_checkpoint requires Kylex Pro — kylex.io" }`
+- Token expired → same structured error with renewal prompt
+- No git repo → return error with clear message
+- Never crash the MCP server — always return a structured response
+
+---
+
 **Portability — how `.lodestar.md` works across machines and tools:**
 
 `lodestar_load` reads from the **local filesystem only**. It requires the binary to be installed and the MCP server to be running. This is the primary path for CLI users.
@@ -277,6 +317,23 @@ function getProvider(config: LodestarConfig): LLMProvider;
 - `ollamaHost` is only present when provider is `ollama`
 
 **Important:** The synthesis prompt in `prompts/synthesize.md` is identical across all providers. Do not write provider-specific prompts. If a provider produces inconsistent output, fix the prompt — not by branching per provider.
+
+**KylexHostedProvider — Phase 1b:**
+
+| Provider | Endpoint | Auth | Mid-session model | End-session model |
+|---|---|---|---|---|
+| `kylex` | `https://api.kylex.io/synthesize` | JWT Bearer token | Haiku 4.5 | Sonnet 4.6 |
+
+Config when Pro token is present:
+```json
+{
+  "provider": "kylex",
+  "kylexToken": "eyJ...",
+  "kylexTokenExpiry": "2026-04-24T00:00:00Z"
+}
+```
+
+The `KylexHostedProvider` sends the git diff and call type (`checkpoint` | `synthesize`) to the hosted proxy. The proxy selects the model — the binary never calls Anthropic directly when using the kylex provider. Token is validated locally (JWT expiry check) before any network call is made. If validation fails, fall back to BYOK provider with a warning.
 
 ---
 
@@ -683,6 +740,13 @@ When `--diff` is passed and a `.lodestar.history/` file exists, the reader shows
 - Diff panel is Level 1 visibility — always shown when `--diff` is passed
 - No diff panel if no history file exists — show a subtle note: "No previous session to compare"
 
+**Pro gate:** The `--diff` flag requires a valid Kylex Pro token in `~/.lodestar.config.json`.
+- If token is present and valid: render the changes panel as documented.
+- If token is missing or expired: print a single non-blocking line below the main reader:
+  `Session comparison is a Kylex Pro feature — kylex.io`
+  Do not crash. Do not hide the main reader content. The changes panel area is simply absent.
+- Token validation is a local check against the JWT expiry field — no network call required.
+
 ---
 
 ### UI design principles
@@ -924,6 +988,39 @@ These were open questions. They are now decided. Do not reopen them.
 - [x] **How do users get updates?**  
   **Auto-update check on launch via GitHub Releases API — no backend required.** On every `lodestar` command invocation, make a lightweight HTTP GET to `https://api.github.com/repos/kylex-labs/lodestar/releases/latest`. Compare the `tag_name` field against the current binary version. If newer, print a non-blocking notice: `Update available: v0.2.1 → run lodestar update`. The `lodestar update` command downloads the appropriate platform binary from the GitHub Release assets and replaces itself. **Rationale:** GitHub Releases API is zero-infrastructure, zero-cost, and trusted. No kylex.io backend required for Phase 1a. Upgrade to a dedicated endpoint in Phase 1b when telemetry infrastructure exists.
 
+- [x] **Mid-session vs. end-of-session model routing?**
+  **Haiku 4.5 for mid-session checkpoints. Sonnet 4.6 for end-of-session synthesis.**
+  Mid-session checkpoint calls require only file inventory and in-progress decision capture — no deep rationale extraction. Haiku 4.5 handles this reliably at 1/3 the cost of Sonnet. End-of-session synthesis requires rationale extraction ("why", not "what") and rejected approach detection (deleted code → tried and abandoned). Both require multi-step inference across the full diff that Haiku degrades on significantly — weighted MCDA score: Haiku 5.9/10 vs. Sonnet 9.1/10 on synthesis quality, with rationale (30% weight) and rejected approach detection (20% weight) as the highest-gap subtasks.
+
+  Migration to all-Haiku for end-of-session synthesis is explicitly gated on:
+  - A well-engineered `prompts/synthesize.md` that passes the rationale test across 10 consecutive sessions
+  - Every `decisions[].rationale` field answers *why*, not *what*
+  - At least one `rejected[]` entry detected per session where code was deleted
+
+  Do not migrate on cost grounds alone. Prompt engineering is the variable to optimise first.
+
+  All-Sonnet was rejected: unnecessary cost — mid-session calls do not require deep reasoning.
+  All-Haiku was rejected for launch: produces technically valid `.lodestar.md` that reads as a git log summary — shallow decisions, missing rationale. That is the exact failure mode Lodestar is designed to prevent.
+
+- [x] **Is `lodestar review --diff` a free or Pro feature?**
+  **Pro only.** The session comparison panel (changes since last session) is the highest-value carrot for Pro conversion — a user who has accumulated 5+ sessions of history and sees "3 new decisions, 1 question resolved, 2 deps added since last week" has the clearest upgrade prompt. Gating it in the free tier removes the primary upgrade trigger. The free tier delivers full synthesis output and all 3 disclosure levels in the reader — no content is withheld. Only the cross-session comparison capability is gated.
+
+  Free tier `lodestar review` must show a subtle, non-punitive prompt when `--diff` is passed without a Pro token:
+  ```
+  Session comparison is a Kylex Pro feature.
+  kylex.io → upgrade to see what changed since last session.
+  ```
+  Do not show an error. Do not crash. Redirect gracefully.
+
+- [x] **What is the Pro tier gating strategy?**
+  **Capability gating — not content blur, not content depth gating.**
+  The `.lodestar.md` file is a committed text file on the user's local machine. Any blur or visibility restriction applied in the reader UI is trivially bypassed with `cat .lodestar.md`. Content-based gating on local files is not enforceable and breeds resentment without generating upgrades.
+
+  The Pro gate is: features that require server-side infrastructure — hosted synthesis (no BYOK needed), mid-session checkpoint calls, session diff panel, extended 30-day history, 200-call monthly quota. Free users have complete access to all synthesis output content. Pro users get workflow automation that is genuinely impossible to self-host without the Kylex backend.
+
+  Content blur was rejected: bypassed by reading the local file directly. Not enforceable.
+  Content depth gating was rejected: punishes free users before they are sold on the value. AHA moment must come before the upgrade prompt.
+
 ---
 
 ## GTM & distribution model — locked
@@ -1007,23 +1104,40 @@ Reads structural metadata from the filesystem to generate a skeleton `.lodestar.
 
 ## Future phases (do not build now)
 
-**Phase 1b — Kylex Pro tier:**
-- Background agent — passive session watcher; fires automatically at session end; no explicit synthesize command
-- Auto drift detection — continuous comparison against original brief or prior context; surfaces contradictions without being asked
-- `lodestar_diff()` as an always-on signal, not a manual command
-- Subscription paywall — Phase 1b features are Pro-only
+**Phase 1b — Pro tier infrastructure (next phase):**
+- kylex.io Pro landing page — pricing, checkout, founding member CTA
+- Stripe integration — $9.99/month subscription, webhook handling
+- Auth layer — JWT token issued on Stripe payment_succeeded webhook
+- Hosted synthesis proxy — thin Node.js API: validates token, routes to Anthropic (Haiku mid / Sonnet end), returns result. Stateless — no user data stored server-side.
+- KylexHostedProvider — new `src/providers/kylex.ts` implementing `LLMProvider` interface
+- lodestar init Pro flow — detect existing token, skip BYOK if Pro subscriber
+- Usage counter — Upstash Redis, call tracking per user per billing month, 200-call soft cap
+- lodestar_checkpoint() — new MCP tool, Haiku synthesis on partial diff, no .lodestar.md write, Pro only
+- lodestar review --diff — moves from free to Pro, token-gated
+- 30-day history rotation — replaces 3-file free tier limit for Pro subscribers
+- lodestar_diff() — Phase 1b drift detection stub becomes live tool
 
-**Phase 2 — Kylex Pro tier:**
-- Cross-project pattern diffing — compare `.lodestar.md` files across multiple projects
-- Surface recurring patterns, repeated mistakes, architectural inconsistencies
-- Portfolio-level intelligence for multi-project solo founders
+**Phase 1b infrastructure gate (do not start Phase 1b until):**
+- [ ] Phase 1a gate fully passed (10-session synthesis gate, lodestar review stable)
+- [ ] EULA written and attached to binary
+- [ ] kylex.io domain registered and landing page live
 
-**Phase 3 — Kylex Pro tier:**
-- Kite integrated scan — security scan triggered automatically before session synthesis
-- Vela brief as drift reference — accept Vela output as the authoritative intent document
-- Full Kylex suite context awareness for paid members
+**Phase 2 — Pro growth:**
+- Background agent — passive session watcher; fires lodestar_synthesize automatically at session end; no explicit command needed
+- Multi-project dashboard — cross-project pattern view on kylex.io Pro portal
+- Shareable .lodestar.md URL — cloud-hosted permalink, no GitHub required
+- Haiku prompt engineering — target: all-Haiku synthesis passing the rationale test across 10 sessions. Migration gate: every `decisions[].rationale` answers *why*, at least one `rejected[]` detected per session with deleted code.
+- Telemetry dashboard — anonymised usage data (sessions/week, provider split, section expansion rates) informing Phase 3 priorities
 
-**Binary compilation (required before public launch):**
+**Phase 3 — Kylex suite integration:**
+- Kite integrated scan — security scan triggered automatically before end-of-session synthesis
+- Gangway (Shuffle) integration — design-to-code handoff aware of Lodestar session context
+- Pharos cross-reference — session decisions searchable in historical project archive
+- Full Kylex suite context for Pro members
+
+**Product boundary reminder:** Lodestar's scope is session state only. Phase 2 and 3 features that touch Pharos (archive search), Gangway (design handoff), or Kite (security scanning) are integration points — not Lodestar features. Do not implement adjacent product logic inside Lodestar. Flag and stop.
+
+**Binary compilation (required before public launch — still pending):**
 - Use `pkg` (Vercel) or `nexe` to compile the Node.js app to a standalone binary
 - Target: macOS arm64, macOS x64, Linux x64, Windows x64
 - Signed binary for macOS (Apple Developer ID) and Windows (code signing cert)
@@ -1032,5 +1146,5 @@ Reads structural metadata from the filesystem to generate a skeleton `.lodestar.
 
 ---
 
-*Lodestar — Kylex Module 00 — Titania Labs LLC*  
+*Lodestar — Kylex Module 00 — Titania Labs LLC*
 *kylex.io — Binary distribution, closed source*
