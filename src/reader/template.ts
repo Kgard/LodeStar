@@ -857,6 +857,42 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
   text-decoration: none;
 }
 .pro-upgrade-link:hover { text-decoration: underline; }
+.free-feature-card {
+  border: 1px solid var(--teal);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+.free-feature-header {
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.free-feature-header:hover { background: var(--bg); }
+.free-feature-header .arrow { transition: transform 0.2s; }
+.free-feature-card.open .free-feature-header .arrow { transform: rotate(90deg); }
+.free-feature-body {
+  padding: 0 1.25rem 1.25rem;
+  display: none;
+}
+.free-feature-card.open .free-feature-body { display: block; }
+.free-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: white;
+  background: var(--teal);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
 .prd-wireframe pre {
   font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
   font-size: 0.72rem;
@@ -914,12 +950,16 @@ ${featureCount > 0 ? `
 </div>
 ` : ""}
 
-<div class="badges">
-  <div class="badge"><span class="badge-count">${decisionCount}</span><span class="badge-label">Decisions</span></div>
-  <div class="badge"><span class="badge-count">${patternCount}</span><span class="badge-label">Patterns</span></div>
-  <div class="badge"><span class="badge-count">${depCount}</span><span class="badge-label">Deps</span></div>
-  <div class="badge"><span class="badge-count" ${blockingCount > 0 ? 'style="color:var(--blocking)"' : ""}>${questionCount}</span><span class="badge-label">Questions</span></div>
+${questionCount > 0 ? `
+<div class="brief-section" style="margin-bottom:1.5rem">
+  <div style="font-size:0.9rem;font-weight:600;color:var(--teal);margin-bottom:0.5rem">Open Questions</div>
+  ${c.openQuestions.map((q) => `
+  <div style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.3rem 0;font-size:0.85rem">
+    ${q.blocking ? '<span class="blocking-tag" style="flex-shrink:0;margin-top:0.1rem">blocking</span>' : '<span class="nonblocking-tag" style="flex-shrink:0;margin-top:0.1rem">non-blocking</span>'}
+    <span style="color:var(--text)">${escapeHtml(q.question)}</span>
+  </div>`).join("")}
 </div>
+` : ""}
 
 <!-- Pro feature placeholders -->
 <div style="margin-bottom:1.5rem">
@@ -972,20 +1012,21 @@ ${featureCount > 0 ? `
 </div>
 
 ${(c.diagrams ?? []).length > 0 ? `
-<div class="section open">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span><span class="arrow">&#9656;</span> Architecture & Flows</span>
-    <span class="section-badge">${(c.diagrams ?? []).length}</span>
+<div class="free-feature-card" id="arch-card">
+  <span class="free-badge">Free</span>
+  <div class="free-feature-header" onclick="document.getElementById('arch-card').classList.toggle('open')">
+    <span class="arrow" style="color:var(--teal)">&#9656;</span>
+    <span style="font-size:0.8rem;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:0.05em">Architecture & Flows</span>
   </div>
-  <div class="section-body">
-    ${(c.diagrams ?? []).map((d, i) => `
-    <div class="diagram-container">
-      <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
-      <div class="mermaid-diagram" onclick="enlargeDiagram(this)">
-        <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
-        <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
-      </div>
-    </div>`).join("")}
+  <div class="free-feature-body">
+  ${(c.diagrams ?? []).map((d, i) => `
+  <div class="diagram-container">
+    <div class="diagram-title">${escapeHtml(d.title)}<span class="diagram-type-tag">${escapeHtml(d.type)}</span></div>
+    <div class="mermaid-diagram" onclick="enlargeDiagram(this)">
+      <pre class="mermaid" id="mermaid-${i}">${d.mermaid}</pre>
+      <noscript><pre class="mermaid-fallback">${escapeHtml(d.mermaid)}</pre></noscript>
+    </div>
+  </div>`).join("")}
   </div>
 </div>
 ` : ""}
@@ -1028,6 +1069,13 @@ ${(c.integrations ?? []).length > 0 ? `
 
 <div id="tab-history" class="tab-content">
 
+<div class="badges">
+  <div class="badge"><span class="badge-count">${decisionCount}</span><span class="badge-label">Decisions</span></div>
+  <div class="badge"><span class="badge-count">${patternCount}</span><span class="badge-label">Patterns</span></div>
+  <div class="badge"><span class="badge-count">${depCount}</span><span class="badge-label">Deps</span></div>
+  <div class="badge"><span class="badge-count" ${blockingCount > 0 ? 'style="color:var(--blocking)"' : ""}>${questionCount}</span><span class="badge-label">Questions</span></div>
+</div>
+
 <div class="section open">
   <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
     <span><span class="arrow">&#9656;</span> Decisions</span>
@@ -1043,19 +1091,6 @@ ${(c.integrations ?? []).length > 0 ? `
   </div>
 </div>
 
-<div class="section">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-    <span><span class="arrow">&#9656;</span> Open Questions</span>
-    <span class="section-badge">${questionCount}</span>
-  </div>
-  <div class="section-body">
-    ${c.openQuestions.length === 0 ? '<div class="item">No open questions.</div>' : c.openQuestions.map((q) => `
-    <div class="item">
-      ${escapeHtml(q.question)}
-      ${q.blocking ? '<span class="blocking-tag">blocking</span>' : '<span class="nonblocking-tag">non-blocking</span>'}
-    </div>`).join("")}
-  </div>
-</div>
 
 <div class="section">
   <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
