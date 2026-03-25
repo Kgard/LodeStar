@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import { simpleGit, type SimpleGit } from "simple-git";
 
 const LODESTAR_FILENAME = ".lodestar.md";
+const BRIEF_FILES = ["CLAUDE.md", "PRD.md", "BRIEF.md", "lodestar.md"];
 
 export interface GitSnapshot {
   diff: string;
@@ -12,6 +13,7 @@ export interface GitSnapshot {
   commitLog: string;
   status: string;
   packageChanges: string | null;
+  briefDiff: string | null;
 }
 
 export interface GitError {
@@ -132,12 +134,49 @@ export async function captureGitSnapshot(
 
     const packageChanges = await getPackageChanges(git, lastSynthCommit);
 
+    // Separate brief diff from work diff
+    // Brief files get their own channel — don't compete with code for token budget
+    let briefDiff: string | null = null;
+    const briefExcludes = BRIEF_FILES.map((f) => `:(exclude)${f}`);
+
+    // Extract brief-only diffs (uncommitted + committed)
+    const briefParts: string[] = [];
+    for (const bf of BRIEF_FILES) {
+      try {
+        const uncommittedBrief = await git.diff(["HEAD", "--", bf]);
+        if (uncommittedBrief.trim()) briefParts.push(uncommittedBrief.trim());
+      } catch { /* no changes */ }
+
+      if (lastSynthCommit) {
+        try {
+          const committedBrief = await git.diff([lastSynthCommit, "HEAD", "--", bf]);
+          if (committedBrief.trim()) briefParts.push(committedBrief.trim());
+        } catch { /* no changes */ }
+      }
+    }
+    if (briefParts.length > 0) {
+      briefDiff = briefParts.join("\n");
+    }
+
+    // Get work-only diffs (exclude brief files)
+    let workDiff = diff;
+    let workCommittedDiff = committedDiff;
+    try {
+      workDiff = await git.diff(["HEAD", "--", ".", ...briefExcludes]);
+    } catch { /* fall back to full diff */ }
+    if (lastSynthCommit) {
+      try {
+        workCommittedDiff = await git.diff([lastSynthCommit, "HEAD", "--", ".", ...briefExcludes]);
+      } catch { /* fall back to full diff */ }
+    }
+
     return {
-      diff: diff || "(no uncommitted changes)",
-      committedDiff: committedDiff.trim() || "(no committed changes since last synthesis)",
+      diff: workDiff || "(no uncommitted changes)",
+      committedDiff: workCommittedDiff.trim() || "(no committed changes since last synthesis)",
       commitLog: commitLog.trim() || "(no commits)",
       status: status.trim() || "(working tree clean)",
       packageChanges,
+      briefDiff,
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

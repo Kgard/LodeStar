@@ -36,6 +36,7 @@ function buildInput(parts: {
   commitLog: string;
   gitStatus: string;
   packageChanges: string | null;
+  briefDiff: string | null;
   sessionNotes: string | null;
   projectName: string;
   existingContext: string | null;
@@ -52,6 +53,13 @@ function buildInput(parts: {
   lines.push("```");
   lines.push(parts.committedDiff);
   lines.push("```");
+  if (parts.briefDiff) {
+    lines.push("");
+    lines.push("**Project brief changes (CLAUDE.md / PRD.md):**");
+    lines.push("```");
+    lines.push(parts.briefDiff);
+    lines.push("```");
+  }
   lines.push("");
   lines.push("**Commit log since last synthesis:**");
   lines.push("```");
@@ -367,6 +375,7 @@ export async function synthesizeContext(
     commitLog: gitResult.commitLog,
     gitStatus: gitResult.status,
     packageChanges: gitResult.packageChanges,
+    briefDiff: gitResult.briefDiff,
     sessionNotes: input.sessionNotes ?? null,
     projectName,
     existingContext: contextWithVerification,
