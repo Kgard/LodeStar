@@ -947,10 +947,17 @@ This has build implications:
 - The `package.json` `bin` entry is for development convenience only; the shipped artifact is a compiled binary (pkg, nexe, or equivalent)
 
 **Tier model:**
-- **Lodestar Free** — Phase 1a binary: `lodestar init`, `lodestar_synthesize`, `lodestar_load`, `lodestar review`. Manual CLI only. Free forever.
-- **Kylex Pro** — Phase 1b+: background agent, auto drift detection, cross-project diffing, Kite integrated scan. Subscription.
+- **Lodestar Free** — Phase 1a binary: `lodestar init`, `lodestar_synthesize`, `lodestar_load`, `lodestar review` (current session only). Manual CLI only. Free forever. 3-file history rotation.
+- **Lodestar Pro** ($9.99/month) — everything in Free plus the review upgrade bundle:
+  1. **Session history timeline** — scroll through 30 days of sessions, see how the project evolved. Free users see "3 of N sessions available" with greyed-out older entries.
+  2. **Session diff panel** — compare any two sessions, see what changed (decisions added/resolved, deps, patterns).
+  3. **Team sharing** — shareable URL for the review page (not just local file).
+  4. **AI session summary** — "Here's what changed across your last 5 sessions in one paragraph."
+  Plus: hosted synthesis (no BYOK), mid-session checkpoints, 200 calls/month.
 
-The free tier is community candy that builds the Kylex newsletter audience. The pro tier is where revenue lives. Phase 1a builds the free tier. Phase 1b+ builds the pro tier.
+The free tier is community candy that builds the newsletter audience. The pro tier is where revenue lives. Phase 1a builds the free tier. Phase 1b+ builds the pro tier.
+
+**Pro upgrade trigger strategy:** The review page is the conversion surface. Free users see full current-session content but hit the wall on history depth. The timeline shows greyed-out sessions they can't access — not hidden, just aged out. The upgrade prompt appears naturally when they want to go back further than 3 sessions.
 
 The synthesis prompt is the core product. Get that right before optimising anything else.
 
