@@ -26,7 +26,7 @@ export async function load(projectRoot: string): Promise<LoadResult> {
       success: true,
       context: null,
       summary:
-        "No .lodestar.md found. Run lodestar_synthesize to create context for this project.",
+        "No .lodestar.md found. Run 'lodestar save' to create context for this project, or 'lodestar bootstrap' to capture your existing project structure.",
       path: filePath,
     };
   }
@@ -61,6 +61,18 @@ export async function load(projectRoot: string): Promise<LoadResult> {
 
   const decisionCount = context.decisions.length;
   const questionCount = context.openQuestions.length;
+
+  // Detect bootstrapped or empty context
+  const isBootstrapped = context.meta.model === "bootstrap (no LLM)";
+  const isEmpty = decisionCount === 0 && context.patterns.length === 0 && context.features.length === 0;
+  const hasUnknowns = context.dependencies.some((d) => d.purpose.includes("[UNKNOWN]"));
+
+  if (isBootstrapped || isEmpty || hasUnknowns) {
+    warnings.push(
+      "This context was bootstrapped from your project structure — decisions and rationale are not yet captured. Run 'lodestar save' or 'lodestar end' after your next coding session to populate them."
+    );
+  }
+
   const summary = `Loaded context from ${context.meta.date}. ${decisionCount} decision${decisionCount !== 1 ? "s" : ""}, ${questionCount} open question${questionCount !== 1 ? "s" : ""}.`;
 
   return {
