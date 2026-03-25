@@ -6,6 +6,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { exec } from "node:child_process";
 import { parseMarkdown, type LodestarContext } from "./schema.js";
+import { captureGitSnapshot, isGitError } from "./git.js";
+import { synthesizeContext } from "./synthesize.js";
 import { renderReaderHTML } from "./reader/template.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
@@ -73,6 +75,21 @@ export async function runReview(options: {
   showDiff: boolean;
 }): Promise<void> {
   const resolved = path.resolve(options.projectRoot);
+
+  // Auto-save if there are changes since last synthesis
+  const gitResult = await captureGitSnapshot(resolved);
+  if (!isGitError(gitResult)) {
+    const hasUncommitted = gitResult.diff !== "(no uncommitted changes)" &&
+      !gitResult.diff.split("\n").every((l) => l.includes(".lodestar.md") || !l.trim());
+    const hasCommitted = gitResult.committedDiff !== "(no committed changes since last synthesis)";
+    if (hasUncommitted || hasCommitted) {
+      console.error("Changes detected — saving before review...");
+      const saveResult = await synthesizeContext({ projectRoot: resolved, mode: "checkpoint" });
+      if (saveResult.success) {
+        console.error(`✓ ${saveResult.summary}`);
+      }
+    }
+  }
 
   const context = await readContext(resolved);
   const historyContext = options.showDiff
