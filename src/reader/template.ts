@@ -362,14 +362,15 @@ body {
   color: var(--text);
   font-size: 16px;
   line-height: 1.6;
-  padding: 2rem 1rem;
+  padding: 0 1rem 2rem;
 }
-.container { max-width: 1024px; margin: 0 auto; }
+.container { max-width: 1024px; margin: 36px auto; padding: 0 36px; }
 .header {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.25rem;
+  padding-top: 18px;
+  margin-bottom: 36px;
 }
 .logo { display: flex; align-items: center; }
 .logo svg { height: 84px; width: auto; }
@@ -497,9 +498,9 @@ body {
 .footer a:hover { text-decoration: underline; }
 .brief-section {
   background: var(--surface);
-  border: none;
-  border-radius: 0;
-  padding: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
   margin-bottom: 1.5rem;
 }
 .brief-header {
@@ -604,10 +605,11 @@ body {
 }
 .sidebar-section {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  padding: 1rem 0;
+  margin-bottom: 0;
 }
 .sidebar-title {
   font-size: 0.7rem;
@@ -656,23 +658,23 @@ body {
 }
 .tabs {
   display: flex;
-  gap: 0;
+  gap: 0.5rem;
   margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--border);
 }
 .tab {
-  padding: 0.75rem 1.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
   user-select: none;
-  transition: color 0.15s, border-color 0.15s;
+  transition: all 0.15s;
+  background: var(--surface);
 }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+.tab:hover { color: var(--text); border-color: var(--teal); }
+.tab.active { color: white; background: linear-gradient(135deg, var(--teal), #1a7ab5); border-color: transparent; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 .prd-h1 {
@@ -858,7 +860,7 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
 }
 .pro-upgrade-link:hover { text-decoration: underline; }
 .free-feature-card {
-  border: 1px solid var(--teal);
+  border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 0.75rem;
   position: relative;
@@ -920,14 +922,16 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
 
 ${diffHtml}
 
-<div class="summary-layout">
 <div class="summary-main">
 
 ${featureCount > 0 ? `
-<div class="brief-section">
-  <div class="brief-header">
-    <span class="brief-title">Build Status</span>
-    <span class="brief-overall">${overallPercent}% Complete</span>
+<div class="brief-section" style="border:none;padding-left:0;padding-right:0">
+  <div class="brief-header" style="flex-direction:row;justify-content:space-between;align-items:center">
+    <div>
+      <span class="brief-title">Build Status</span>
+      <span class="brief-overall" style="margin-left:0.75rem">${overallPercent}% Complete</span>
+    </div>
+    <span style="font-size:0.7rem;color:var(--text-muted)">Last updated: ${escapeHtml(c.meta.date)}</span>
   </div>
   <div class="feature-grid">
   ${(c.features ?? []).map((f) => {
@@ -947,6 +951,17 @@ ${featureCount > 0 ? `
     </div>`;
   }).join("")}
   </div>
+</div>
+` : ""}
+
+${c.projectSummary ? `
+<div class="brief-section" style="border:1px solid var(--border);border-radius:8px;padding:1.25rem;margin-bottom:1.5rem">
+  <div style="font-size:0.9rem;font-weight:600;color:var(--teal);margin-bottom:0.5rem">Project Overview</div>
+  <div style="font-size:0.85rem;line-height:1.6;color:var(--text);margin-bottom:0.5rem">${escapeHtml(c.projectSummary)}</div>
+  ${(c.userSegments ?? []).length > 0 ? `
+  <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.5rem">
+    ${(c.userSegments ?? []).map((s) => `<span class="sidebar-tag">${escapeHtml(s)}</span>`).join("")}
+  </div>` : ""}
 </div>
 ` : ""}
 
@@ -1033,38 +1048,6 @@ ${(c.diagrams ?? []).length > 0 ? `
 
 
 </div><!-- end summary-main -->
-
-<div class="summary-sidebar">
-${c.projectSummary ? `
-  <div class="sidebar-section">
-    <div class="sidebar-title">Project Overview</div>
-    <div class="sidebar-text">${escapeHtml(c.projectSummary)}</div>
-    ${(c.userSegments ?? []).length > 0 ? `
-    <div style="margin-top:0.5rem">
-      ${(c.userSegments ?? []).map((s) => `<span class="sidebar-tag">${escapeHtml(s)}</span>`).join("")}
-    </div>` : ""}
-  </div>
-` : ""}
-${(c.integrations ?? []).length > 0 ? `
-  <div class="sidebar-section">
-    <div class="sidebar-title">Integrations</div>
-    ${(c.integrations ?? []).map((i) => `
-    <div class="sidebar-integration">
-      <span class="sidebar-integration-name">${escapeHtml(i.name)}</span>
-      <span class="sidebar-integration-cat">${escapeHtml(i.category)}</span>
-    </div>`).join("")}
-  </div>
-` : ""}
-  <div class="sidebar-section">
-    <div class="sidebar-title">Session</div>
-    <div style="font-size:0.8rem;color:var(--text-muted);line-height:1.6">
-      ${escapeHtml(c.meta.date)}<br>
-      ${escapeHtml(c.meta.model)}${c.meta.sessionDuration ? `<br>${escapeHtml(c.meta.sessionDuration)}` : ""}
-    </div>
-  </div>
-</div><!-- end summary-sidebar -->
-
-</div><!-- end summary-layout -->
 </div><!-- end tab-summary -->
 
 <div id="tab-history" class="tab-content">
