@@ -12,15 +12,32 @@ export interface LLMProvider {
   readonly defaultModel: string;
 }
 
-export function getProvider(config: LodestarConfig): LLMProvider {
+// Model routing: checkpoint (mid-session) vs full (end-of-session)
+const CHECKPOINT_MODELS: Record<ProviderName, string> = {
+  anthropic: "claude-haiku-4-5-20251001",
+  openai: "gpt-4o-mini",
+  ollama: "llama3.2",
+};
+
+const FULL_MODELS: Record<ProviderName, string> = {
+  anthropic: "claude-sonnet-4-6",
+  openai: "gpt-4o",
+  ollama: "llama3.2",
+};
+
+export function getProvider(config: LodestarConfig, mode: "checkpoint" | "full" = "full"): LLMProvider {
+  const modelOverride = mode === "checkpoint"
+    ? CHECKPOINT_MODELS[config.provider]
+    : FULL_MODELS[config.provider];
+
   switch (config.provider) {
     case "anthropic":
-      return new AnthropicProvider(config.apiKey!, config.model);
+      return new AnthropicProvider(config.apiKey!, modelOverride);
     case "openai":
-      return new OpenAIProvider(config.apiKey!, config.model);
+      return new OpenAIProvider(config.apiKey!, modelOverride);
     case "ollama":
       return new OllamaProvider(
-        config.model,
+        modelOverride,
         config.ollamaHost ?? "http://localhost:11434"
       );
   }

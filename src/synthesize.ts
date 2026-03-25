@@ -15,9 +15,12 @@ import { splitDiffByFile, truncateByPriority } from "./diff-priority.js";
 const LODESTAR_FILENAME = ".lodestar.md";
 const TOKEN_BUDGET = 6000;
 
+export type SynthesisMode = "checkpoint" | "full";
+
 export interface SynthesizeInput {
   projectRoot: string;
   sessionNotes?: string;
+  mode?: SynthesisMode;
 }
 
 export interface SynthesizeResult {
@@ -234,7 +237,8 @@ export async function synthesizeContext(
     return { success: false, path: filePath, summary: configResult.error! };
   }
 
-  const provider = getProvider(configResult.config);
+  const mode = input.mode ?? "full";
+  const provider = getProvider(configResult.config, mode);
 
   // Capture git state
   const gitResult = await captureGitSnapshot(resolved);

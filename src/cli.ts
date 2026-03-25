@@ -84,7 +84,7 @@ async function runStart(args: string[]): Promise<void> {
   console.log(JSON.stringify(result.context, null, 2));
 }
 
-async function runSave(args: string[]): Promise<boolean> {
+async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promise<boolean> {
   const isQuick = args.includes("--quick");
   const pathArgs = args.filter((a) => !a.startsWith("--"));
   const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
@@ -117,7 +117,8 @@ async function runSave(args: string[]): Promise<boolean> {
     console.error(`Saving session checkpoint for ${projectRoot} ...`);
   }
 
-  const result = await synthesizeContext({ projectRoot, sessionNotes: sessionNotes ?? undefined });
+  const mode = forceMode ?? "checkpoint";
+  const result = await synthesizeContext({ projectRoot, sessionNotes: sessionNotes ?? undefined, mode });
 
   if (!result.success) {
     console.error(`✗ ${result.summary}`);
@@ -138,8 +139,8 @@ async function runEnd(args: string[]): Promise<void> {
   const pathArgs = args.filter((a) => !a.startsWith("--"));
   const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
 
-  // Step 1: Synthesize (runSave handles notes prompt)
-  const success = await runSave(args);
+  // Step 1: Synthesize with full model (end-of-session)
+  const success = await runSave(args, "full");
   if (!success) {
     process.exit(1);
   }
