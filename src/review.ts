@@ -114,9 +114,6 @@ export async function runReview(options: {
       process.exit(0);
     }, IDLE_TIMEOUT_MS);
 
-    const html = await generateHtml();
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-
     if (req.url === "/check") {
       try {
         const stat = await fs.stat(path.join(resolved, LODESTAR_FILENAME));
@@ -132,10 +129,14 @@ export async function runReview(options: {
     if (req.url === "/brief") {
       const brief = await readBriefHtml(resolved);
       if (brief) {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(brief);
         return;
       }
     }
+
+    const html = await generateHtml();
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(html);
   });
 
