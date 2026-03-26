@@ -8,18 +8,22 @@
 
 ## What you are building
 
-Lodestar is an MCP server that solves **session amnesia** in Claude Code. Every Claude Code session starts cold — no memory of architectural decisions, established patterns, rejected approaches, or open questions. Lodestar synthesizes the current session into a structured `.lodestar.md` context file that loads at the next session start, giving Claude Code a warm boot.
+Lodestar is an MCP server that solves **flow state continuity** for AI-assisted development. Every AI coding session starts cold — no memory of architectural decisions, established patterns, rejected approaches, or open questions. The code is always saved. The thinking behind it isn't. Lodestar synthesizes the current session into a structured `.lodestar.md` context file committed to the project repo, giving any AI coding tool a warm start grounded in decisions and reasoning — not just diffs.
+
+**This is not a Claude Code feature. It is a codebase feature. It works with Claude Code, Cursor, Windsurf, or any AI coding tool.**
 
 **Phase 1a scope — the only thing being built right now:**
 - `lodestar_synthesize()` — reads current session file diffs, synthesizes via LLM, writes `.lodestar.md`
 - `lodestar_load()` — reads `.lodestar.md`, returns structured context for session initialization
-- `lodestar init` — first-run CLI wizard: provider selection, key validation, config creation
+- `lodestar init` — first-run CLI wizard: provider selection, key validation, config creation, optional SessionStart hook setup
 - `lodestar review` — CLI command that opens a browser-based progressive disclosure reader for the current `.lodestar.md`
+- **Terminal summary** — distilled 5-line session briefing printed automatically at session start via SessionStart hook (configured during `lodestar init`)
 
 **Sequencing within Phase 1a — build in this order:**
-1. `lodestar init` — prerequisite for everything else
+1. `lodestar init` — prerequisite for everything else; includes terminal summary hook setup
 2. `lodestar_synthesize` + `lodestar_load` — core MCP tools; must pass 10-session gate before proceeding
-3. `lodestar review` — polish item built after synthesize/load are stable
+3. Terminal summary hook — low effort, high impact; build alongside or immediately after init
+4. `lodestar review` — polish item built after synthesize/load are stable
 
 **Not in scope for Phase 1a (do not build):**
 - Passive background watching or automatic session-end firing (Phase 2)
@@ -69,6 +73,7 @@ lodestar/
 │   ├── synthesize.ts             ← lodestar_synthesize() implementation
 │   ├── load.ts                   ← lodestar_load() implementation
 │   ├── review.ts                 ← lodestar review — local HTTP server + browser open
+│   ├── summary.ts                ← terminal summary — distilled context for SessionStart hook
 │   ├── diff.ts                   ← lodestar_diff() STUB ONLY — Phase 1b
 │   ├── git.ts                    ← Git diff utilities via simple-git
 │   ├── history.ts                ← .lodestar.history/ rotation logic
@@ -270,6 +275,61 @@ https://raw.githubusercontent.com/{user}/{repo}/main/.lodestar.md
 This URL works for any AI tool that can fetch a URL. For private repos, the user needs a GitHub personal access token, but the pattern is identical.
 
 **`lodestar review` implication:** The review reader must display the raw GitHub URL for the current `.lodestar.md` at the bottom of the page — formatted as a copyable link. This is the escape hatch for web app users. It requires the repo's remote URL to be read from `git remote get-url origin` and formatted accordingly. If the repo has no remote, omit this section gracefully.
+
+---
+
+## Terminal summary
+
+The terminal summary is a distilled 5-line briefing printed automatically at session start via a Claude Code `SessionStart` hook. It is the **momentum layer** — fast, frictionless, zero interaction required. The browser reader (`lodestar review`) is the **depth layer** — for active investigation when something needs fuller context.
+
+**Two surfaces, two jobs — do not conflate them:**
+
+| Surface | Trigger | Job | Depth |
+|---|---|---|---|
+| Terminal summary | Automatic — SessionStart hook | Reorient in 10 seconds | Shallow |
+| `lodestar review` | Manual — user runs command | Reconstruct full context | Deep |
+
+**Terminal summary output format:**
+
+```
+═══════════════════════════════════════════════
+  Lodestar  ·  [project name]  ·  [X days ago]
+═══════════════════════════════════════════════
+  Where you left off:
+  → [nextSession bullet 1]
+  → [nextSession bullet 2]
+  → [nextSession bullet 3]
+
+  Last rejected: [most recent rejected.approach] — [reason]
+
+  [N] blocking question(s): [first blocking question text]
+═══════════════════════════════════════════════
+  Full session context → lodestar review
+═══════════════════════════════════════════════
+```
+
+**Rules:**
+- Print to stderr — MCP uses stdout, terminal output must never pollute the MCP wire
+- If no `.lodestar.md` exists: print a single quiet line — "No Lodestar context yet. Run lodestar save at the end of this session."
+- If context file is older than 7 days: append a subtle note — "Context is X days old"
+- Never print the full `.lodestar.md` — the terminal is the 10-second version
+- The final line "Full session context → lodestar review" is always shown — signpost to the depth layer
+- No interaction, no prompts, no questions — this fires and exits
+
+**Implementation — `src/summary.ts`:**
+- Reads `.lodestar.md` from `projectRoot` (shares parse logic with `lodestar_load`)
+- Formats distilled output as a plain string
+- Called by the SessionStart hook script generated during `lodestar init`
+
+**The hook script generated by `lodestar init` (Claude Code):**
+```bash
+#!/bin/bash
+# Generated by lodestar init — do not edit manually
+lodestar summary --project "$CLAUDE_PROJECT_DIR"
+exit 0
+```
+
+**For Cursor and Windsurf:** No equivalent hook mechanism exists in Phase 1a. These users run `lodestar review` manually at session start. `lodestar start` as an explicit command is a Phase 1b item for non-Claude Code users.
 
 ---
 
