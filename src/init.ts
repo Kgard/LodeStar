@@ -584,6 +584,53 @@ Sign up for Kylex updates: kylex.io
     }
   }
 
+  // Offer SessionStart hook for Claude Code
+  const wantsSummary = await confirm({
+    message: "Show a session summary when Claude Code starts? (5-line briefing, no commands needed)",
+    default: true,
+  });
+
+  if (wantsSummary) {
+    try {
+      const settingsDir = path.join(process.cwd(), ".claude");
+      await fs.mkdir(settingsDir, { recursive: true });
+      const settingsPath = path.join(settingsDir, "settings.json");
+
+      let settings: Record<string, unknown> = {};
+      try {
+        const raw = await fs.readFile(settingsPath, "utf-8");
+        settings = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        // New file
+      }
+
+      // Add or update hooks
+      const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
+      const sessionStart = (hooks.SessionStart ?? []) as Array<Record<string, unknown>>;
+
+      // Check if already installed
+      const alreadyInstalled = sessionStart.some((h) =>
+        typeof h.command === "string" && h.command.includes("lodestar summary")
+      );
+
+      if (!alreadyInstalled) {
+        sessionStart.push({
+          command: "lodestar summary --project .",
+          event: "SessionStart",
+        });
+        hooks.SessionStart = sessionStart;
+        settings.hooks = hooks;
+        await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+        console.error("✓ SessionStart hook installed — summary will appear when Claude Code starts");
+      } else {
+        console.error("✓ SessionStart hook already installed");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`⚠ Could not install SessionStart hook: ${msg}`);
+    }
+  }
+
   console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Lodestar is ready.
 

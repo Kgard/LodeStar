@@ -30,6 +30,7 @@ Commands:
   lodestar end [path]              End session — synthesize + commit
   lodestar review [path] [--diff]  Open session context in the browser
   lodestar bootstrap [path]        Capture existing project structure (no LLM, free)
+  lodestar summary [path]          Print 5-line session briefing (for hooks/scripts)
   lodestar hooks [path]            Install git hooks (auto-save on commit, full sync on push)
   lodestar hooks --remove [path]   Remove git hooks
 
@@ -205,6 +206,12 @@ async function main(): Promise<void> {
           console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
         }
       }
+      break;
+    }
+    case "summary": {
+      const { printSummary } = await import("./summary.js");
+      const projectRoot = path.resolve(args.filter((a) => !a.startsWith("--"))[0] ?? process.cwd());
+      await printSummary(projectRoot);
       break;
     }
     case "bootstrap": {
