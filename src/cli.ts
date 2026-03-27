@@ -62,7 +62,6 @@ async function isFirstRun(projectRoot: string): Promise<boolean> {
 async function runStart(args: string[]): Promise<void> {
   const projectRoot = path.resolve(args[0] ?? process.cwd());
 
-  console.error(`Loading session context for ${projectRoot} ...`);
   const result = await load(projectRoot);
 
   if (!result.success) {
@@ -75,14 +74,51 @@ async function runStart(args: string[]): Promise<void> {
     return;
   }
 
-  console.error(`✓ ${result.summary}`);
+  const c = result.context;
+
+  // Print the terminal summary first
+  const { printSummary } = await import("./summary.js");
+  await printSummary(projectRoot);
+
+  // Print formatted context below
+  if (c.projectSummary) {
+    console.error(`  ${c.projectSummary}`);
+    console.error("");
+  }
+
+  if (c.features.length > 0) {
+    console.error("  Build Status:");
+    for (const f of c.features) {
+      const icon = f.status === "complete" ? "✓" : f.status === "in-progress" ? "○" : "·";
+      console.error(`    ${icon} ${f.feature} — ${f.percentComplete}%${f.notes ? ` — ${f.notes}` : ""}`);
+    }
+    console.error("");
+  }
+
+  if (c.decisions.length > 0) {
+    console.error(`  Decisions (${c.decisions.length}):`);
+    for (const d of c.decisions.slice(0, 5)) {
+      console.error(`    • ${d.decision}`);
+    }
+    if (c.decisions.length > 5) {
+      console.error(`    ... +${c.decisions.length - 5} more`);
+    }
+    console.error("");
+  }
+
+  if (c.openQuestions.length > 0) {
+    console.error(`  Open Questions (${c.openQuestions.length}):`);
+    for (const q of c.openQuestions) {
+      console.error(`    ${q.blocking ? "⚠" : "•"} ${q.question}`);
+    }
+    console.error("");
+  }
+
   if (result.warnings) {
     for (const w of result.warnings) {
       console.error(`  ⚠ ${w}`);
     }
   }
-
-  console.log(JSON.stringify(result.context, null, 2));
 }
 
 async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promise<boolean> {
