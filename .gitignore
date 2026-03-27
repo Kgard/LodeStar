@@ -4,3 +4,4 @@ bundle/
 bin/
 .env
 .lodestar.history/
+.claude/
