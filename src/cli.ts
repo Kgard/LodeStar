@@ -81,11 +81,6 @@ async function runStart(args: string[]): Promise<void> {
   await printSummary(projectRoot);
 
   // Print formatted context below
-  if (c.projectSummary) {
-    console.error(`  ${c.projectSummary}`);
-    console.error("");
-  }
-
   if (c.features.length > 0) {
     console.error("  Build Status:");
     for (const f of c.features) {
