@@ -85,19 +85,24 @@ async function runStart(args: string[]): Promise<void> {
     console.error("  Build Status:");
     for (const f of c.features) {
       const icon = f.status === "complete" ? "✓" : f.status === "in-progress" ? "○" : "·";
-      console.error(`    ${icon} ${f.feature} — ${f.percentComplete}%${f.notes ? ` — ${f.notes}` : ""}`);
+      console.error(`    ${icon} ${f.feature} — ${f.percentComplete}%`);
+      if (f.capabilities && f.capabilities.length > 0) {
+        for (const cap of f.capabilities) {
+          const capIcon = cap.status === "done" ? "✓" : cap.status === "in-progress" ? "○" : "·";
+          console.error(`      ${capIcon} ${cap.name}`);
+        }
+      }
     }
     console.error("");
   }
 
   if (c.decisions.length > 0) {
-    console.error(`  Decisions (${c.decisions.length}):`);
-    for (const d of c.decisions.slice(0, 5)) {
+    console.error(`  Last Session Decisions (${c.decisions.length}):`);
+    for (const d of c.decisions) {
       console.error(`    • ${d.decision}`);
     }
-    if (c.decisions.length > 5) {
-      console.error(`    ... +${c.decisions.length - 5} more`);
-    }
+    console.error("");
+    console.error("  Full decision history → lodestar review");
     console.error("");
   }
 
@@ -168,8 +173,18 @@ async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promi
 }
 
 async function runEnd(args: string[]): Promise<void> {
+  const projectFlag = args.find((a) => a.startsWith("--project=") || a.startsWith("--project "));
   const pathArgs = args.filter((a) => !a.startsWith("--"));
-  const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
+  let projectPath = pathArgs[0] ?? process.cwd();
+  if (projectFlag) {
+    projectPath = projectFlag.split("=")[1] ?? pathArgs[0] ?? process.cwd();
+  }
+  // Also handle --project as separate arg
+  const projectIdx = args.indexOf("--project");
+  if (projectIdx !== -1 && args[projectIdx + 1]) {
+    projectPath = args[projectIdx + 1];
+  }
+  const projectRoot = path.resolve(projectPath);
 
   // Step 1: Synthesize with full model (end-of-session)
   const success = await runSave(args, "full");
@@ -241,7 +256,12 @@ async function main(): Promise<void> {
     }
     case "summary": {
       const { printSummary } = await import("./summary.js");
-      const projectRoot = path.resolve(args.filter((a) => !a.startsWith("--"))[0] ?? process.cwd());
+      let summaryPath = args.filter((a) => !a.startsWith("--"))[0] ?? process.cwd();
+      const summaryProjIdx = args.indexOf("--project");
+      if (summaryProjIdx !== -1 && args[summaryProjIdx + 1]) {
+        summaryPath = args[summaryProjIdx + 1];
+      }
+      const projectRoot = path.resolve(summaryPath);
       await printSummary(projectRoot);
       break;
     }

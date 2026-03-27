@@ -33,11 +33,17 @@ export interface LodestarOpenQuestion {
   blocking: boolean;
 }
 
+export interface LodestarCapability {
+  name: string;
+  status: "done" | "in-progress" | "planned";
+}
+
 export interface LodestarFeature {
   feature: string;
   status: "not-started" | "in-progress" | "complete";
   percentComplete: number;
   notes?: string;
+  capabilities?: LodestarCapability[];
 }
 
 export interface LodestarIntegration {
@@ -118,6 +124,12 @@ export function contextToMarkdown(ctx: LodestarContext): string {
     const bar = f.percentComplete;
     const icon = f.status === "complete" ? "[x]" : f.status === "in-progress" ? "[-]" : "[ ]";
     lines.push(`- ${icon} **${f.feature}** — ${bar}%${f.notes ? ` — ${f.notes}` : ""}`);
+    if (f.capabilities && f.capabilities.length > 0) {
+      for (const cap of f.capabilities) {
+        const capIcon = cap.status === "done" ? "✓" : cap.status === "in-progress" ? "○" : "·";
+        lines.push(`  - ${capIcon} ${cap.name}`);
+      }
+    }
   }
   lines.push("");
 
@@ -299,27 +311,38 @@ export function parseMarkdown(content: string): LodestarContext {
   }
 
   const featuresBlock = sectionContent("Project Brief Status") || sectionContent("Project Brief");
-  const featureLines = featuresBlock
-    .split("\n")
-    .filter((l) => l.startsWith("- "));
-  for (const line of featureLines) {
-    const m = line.match(/^- \[(x| |-)\]\s*\*\*(.+?)\*\*\s*—\s*(\d+)%(?:\s*—\s*(.+))?$/);
-    if (m) {
-      const statusChar = m[1];
+  const allFeatureLines = featuresBlock.split("\n");
+  let currentFeature: LodestarFeature | null = null;
+  for (const line of allFeatureLines) {
+    const featureMatch = line.match(/^- \[(x| |-)\]\s*\*\*(.+?)\*\*\s*—\s*(\d+)%(?:\s*—\s*(.+))?$/);
+    if (featureMatch) {
+      if (currentFeature) ctx.features.push(currentFeature);
+      const statusChar = featureMatch[1];
       const status =
         statusChar === "x"
           ? "complete"
           : statusChar === "-"
             ? "in-progress"
             : "not-started";
-      ctx.features.push({
-        feature: m[2],
+      currentFeature = {
+        feature: featureMatch[2],
         status: status as "not-started" | "in-progress" | "complete",
-        percentComplete: parseInt(m[3], 10),
-        ...(m[4] ? { notes: m[4].trim() } : {}),
+        percentComplete: parseInt(featureMatch[3], 10),
+        ...(featureMatch[4] ? { notes: featureMatch[4].trim() } : {}),
+        capabilities: [],
+      };
+      continue;
+    }
+    const capMatch = line.match(/^\s+- ([✓○·])\s+(.+)$/);
+    if (capMatch && currentFeature) {
+      const capStatus = capMatch[1] === "✓" ? "done" : capMatch[1] === "○" ? "in-progress" : "planned";
+      currentFeature.capabilities!.push({
+        name: capMatch[2],
+        status: capStatus as "done" | "in-progress" | "planned",
       });
     }
   }
+  if (currentFeature) ctx.features.push(currentFeature);
 
   // Future Phases
   const futureBlock = sectionContent("Future Phases");

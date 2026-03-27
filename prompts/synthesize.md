@@ -88,6 +88,10 @@ interface LodestarContext {
     status: "not-started" | "in-progress" | "complete";
     percentComplete: number;
     notes?: string;
+    capabilities?: Array<{
+      name: string;              // specific capability built under this feature
+      status: "done" | "in-progress" | "planned";
+    }>;
   }>;
   futurePhases: Array<{
     phase: string;
@@ -129,7 +133,7 @@ interface LodestarContext {
 - **Decisions**: 3-7 max. Architectural only. No implementation details.
 - **Patterns**: 3-5 max. Structural conventions that affect how someone works in the codebase.
 - **Open questions**: Only questions that require human input to answer. The existing context may include a "Verified resolved" section at the bottom — these questions have been checked against git history and file system evidence. DROP all verified-resolved questions. For remaining questions: (1) Never ask "does X work?" or "is there a bug in Y?" — those are testing tasks, not open questions. (2) Never ask about code you haven't seen in the diff. (3) Only ask questions where the answer changes what gets built next. Maximum 3 questions. Prefer zero questions over speculative ones.
-- **Features**: Assess from evidence in the diff and commit log, not speculation. If a feature's code was committed and no errors are visible, treat it as working. "complete" = works end-to-end with no known issues. "in-progress" = code exists but has known gaps or is partially implemented. Update percentages based on THIS session's progress — don't just copy previous values.
+- **Features**: Assess from evidence in the diff and commit log, not speculation. If a feature's code was committed and no errors are visible, treat it as working. "complete" = works end-to-end with no known issues. "in-progress" = code exists but has known gaps or is partially implemented. Update percentages based on THIS session's progress — don't just copy previous values. List specific capabilities under each feature — individual things that were built (e.g. "two-diff capture", "model routing", "session notes"). Carry forward capabilities from existing context and add new ones from this session's diff.
 - **Diagrams**: 1-2 max. Architecture diagram required. Valid Mermaid syntax, under 15 nodes, actual file names.
 - **Next session**: 3-5 bullet points. Short. What to do first, not what happened.
 - **Carry forward**: projectSummary, userSegments, integrations, futurePhases — copy from existing context unless the diff changes them. Don't regenerate.

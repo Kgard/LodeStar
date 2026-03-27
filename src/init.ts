@@ -584,13 +584,13 @@ Sign up for Kylex updates: kylex.io
     }
   }
 
-  // Offer SessionStart hook for Claude Code
-  const wantsSummary = await confirm({
-    message: "Show a session summary when Claude Code starts? (5-line briefing, no commands needed)",
+  // Offer Claude Code session hooks
+  const wantsAutoHooks = await confirm({
+    message: "Enable automatic session management for Claude Code? (auto-load on start, auto-save on close)",
     default: true,
   });
 
-  if (wantsSummary) {
+  if (wantsAutoHooks) {
     try {
       const settingsDir = path.join(process.cwd(), ".claude");
       await fs.mkdir(settingsDir, { recursive: true });
@@ -604,30 +604,48 @@ Sign up for Kylex updates: kylex.io
         // New file
       }
 
-      // Add or update hooks
       const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
+
+      // SessionStart hook — load context + print summary
       const sessionStart = (hooks.SessionStart ?? []) as Array<Record<string, unknown>>;
-
-      // Check if already installed
-      const alreadyInstalled = sessionStart.some((h) =>
-        typeof h.command === "string" && h.command.includes("lodestar summary")
+      const startInstalled = sessionStart.some((h) =>
+        typeof h.command === "string" && h.command.includes("lodestar")
       );
-
-      if (!alreadyInstalled) {
+      if (!startInstalled) {
         sessionStart.push({
           command: "lodestar summary --project .",
           event: "SessionStart",
         });
         hooks.SessionStart = sessionStart;
-        settings.hooks = hooks;
-        await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-        console.error("✓ SessionStart hook installed — summary will appear when Claude Code starts");
+      }
+
+      // SessionEnd hook — auto-save context
+      const sessionEnd = (hooks.SessionEnd ?? []) as Array<Record<string, unknown>>;
+      const endInstalled = sessionEnd.some((h) =>
+        typeof h.command === "string" && h.command.includes("lodestar")
+      );
+      if (!endInstalled) {
+        sessionEnd.push({
+          command: "lodestar end --project .",
+          event: "SessionEnd",
+        });
+        hooks.SessionEnd = sessionEnd;
+      }
+
+      settings.hooks = hooks;
+      await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+
+      if (!startInstalled || !endInstalled) {
+        console.error("✓ Claude Code hooks installed:");
+        console.error("    SessionStart → loads context + prints summary");
+        console.error("    SessionEnd  → auto-saves + commits context");
+        console.error("  You never need to run lodestar start/end manually.");
       } else {
-        console.error("✓ SessionStart hook already installed");
+        console.error("✓ Claude Code hooks already installed");
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`⚠ Could not install SessionStart hook: ${msg}`);
+      console.error(`⚠ Could not install Claude Code hooks: ${msg}`);
     }
   }
 

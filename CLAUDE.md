@@ -1172,6 +1172,7 @@ Reads structural metadata from the filesystem to generate a skeleton `.lodestar.
 ## Future phases (do not build now)
 
 **Phase 1b — Pro tier infrastructure (next phase):**
+- Cursor/Windsurf VS Code extension — activate()/deactivate() hooks for automatic session start/end, onWillSaveTextDocument for real-time quick updates. Matches Claude Code's SessionStart/SessionEnd automatic flow.
 - kylex.io Pro landing page — pricing, checkout, founding member CTA
 - Stripe integration — $9.99/month subscription, webhook handling
 - Auth layer — JWT token issued on Stripe payment_succeeded webhook
