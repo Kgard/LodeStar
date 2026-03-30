@@ -199,6 +199,16 @@ async function runEnd(args: string[]): Promise<void> {
     await git.add(".lodestar.md");
     await git.commit("chore: update session context via lodestar end");
     console.error(`\n✓ Committed .lodestar.md`);
+
+    // Step 3: Push to remote so the commit timestamp is current
+    try {
+      await git.push();
+      console.error(`✓ Pushed to remote`);
+    } catch (pushErr) {
+      const pushMsg = pushErr instanceof Error ? pushErr.message : String(pushErr);
+      console.error(`⚠ Could not push: ${pushMsg}`);
+      console.error(`  You can push manually: git push`);
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes("nothing to commit") || message.includes("no changes added")) {
