@@ -50,8 +50,10 @@ function mergeDecisions(
   const result: LodestarDecision[] = [];
   const matched = new Set<number>();
 
+  const incomingTitles = incoming.map((d) => d.decision);
+
   for (const prev of existing) {
-    const incomingIdx = incoming.findIndex((d) => normalizeTitle(d.decision) === normalizeTitle(prev.decision));
+    const incomingIdx = findMatchIndex(prev.decision, incomingTitles, matched);
 
     if (incomingIdx !== -1) {
       // Exists in both — merge fields
@@ -99,8 +101,10 @@ function mergeDiagrams(
   const result: LodestarDiagram[] = [];
   const matched = new Set<number>();
 
+  const incomingTitles = incoming.map((d) => d.title);
+
   for (const prev of existing) {
-    const incomingIdx = incoming.findIndex((d) => normalizeTitle(d.title) === normalizeTitle(prev.title));
+    const incomingIdx = findMatchIndex(prev.title, incomingTitles, matched);
 
     if (incomingIdx !== -1) {
       matched.add(incomingIdx);
@@ -178,18 +182,13 @@ function mergePatterns(
   const seen = new Set<string>();
   const result: LodestarContext["patterns"] = [];
 
-  for (const p of existing) {
-    const key = p.pattern.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(p);
-    }
-  }
-
-  for (const p of incoming) {
-    const key = p.pattern.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
+  const allPatterns = [...existing, ...incoming];
+  for (const p of allPatterns) {
+    const norm = normalizeTitle(p.pattern);
+    const isDuplicate = result.some(
+      (r) => normalizeTitle(r.pattern) === norm || similarity(normalizeTitle(r.pattern), norm) >= SIMILARITY_THRESHOLD
+    );
+    if (!isDuplicate) {
       result.push(p);
     }
   }
@@ -223,8 +222,10 @@ function mergeRejected(
   const result: LodestarRejected[] = [];
   const matched = new Set<number>();
 
+  const incomingApproaches = incoming.map((r) => r.approach);
+
   for (const prev of existing) {
-    const incomingIdx = incoming.findIndex((r) => normalizeTitle(r.approach) === normalizeTitle(prev.approach));
+    const incomingIdx = findMatchIndex(prev.approach, incomingApproaches, matched);
 
     if (incomingIdx !== -1) {
       matched.add(incomingIdx);
@@ -292,8 +293,74 @@ function mergeFuturePhases(
 }
 
 /**
- * Normalize a title for matching — lowercase, trim, collapse whitespace.
+ * Normalize a title for matching — lowercase, trim, collapse whitespace,
+ * strip quotes and common punctuation variants.
  */
 function normalizeTitle(title: string): string {
-  return title.toLowerCase().trim().replace(/\s+/g, " ");
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[""''`]/g, "")
+    .replace(/[—–:]/g, "-")
+    .replace(/\s+/g, " ");
+}
+
+/**
+ * Similarity ratio between two strings (0–1) using longest common subsequence.
+ * Conservative threshold: 0.85+ is considered a match.
+ */
+function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length === 0 || b.length === 0) return 0;
+
+  // LCS length via two-row DP
+  const prev = new Uint16Array(b.length + 1);
+  const curr = new Uint16Array(b.length + 1);
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        curr[j] = prev[j - 1] + 1;
+      } else {
+        curr[j] = Math.max(prev[j], curr[j - 1]);
+      }
+    }
+    prev.set(curr);
+    curr.fill(0);
+  }
+  const lcsLen = prev[b.length];
+  return (2 * lcsLen) / (a.length + b.length);
+}
+
+const SIMILARITY_THRESHOLD = 0.85;
+
+/**
+ * Find index of a matching entry by normalized title.
+ * First tries exact normalized match, then falls back to similarity check.
+ */
+function findMatchIndex(
+  needle: string,
+  haystack: string[],
+  exclude?: Set<number>
+): number {
+  const normNeedle = normalizeTitle(needle);
+
+  // Exact normalized match first
+  for (let i = 0; i < haystack.length; i++) {
+    if (exclude?.has(i)) continue;
+    if (normalizeTitle(haystack[i]) === normNeedle) return i;
+  }
+
+  // Similarity fallback
+  let bestIdx = -1;
+  let bestScore = 0;
+  for (let i = 0; i < haystack.length; i++) {
+    if (exclude?.has(i)) continue;
+    const score = similarity(normNeedle, normalizeTitle(haystack[i]));
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+
+  return bestScore >= SIMILARITY_THRESHOLD ? bestIdx : -1;
 }
