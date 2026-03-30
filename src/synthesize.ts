@@ -11,9 +11,11 @@ import { contextToMarkdown, parseMarkdown, type LodestarContext } from "./schema
 import { loadPromptTemplate } from "./prompt.js";
 import { verifyOpenQuestions } from "./verify-questions.js";
 import { splitDiffByFile, truncateByPriority } from "./diff-priority.js";
+import { mergeContexts } from "./merge.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
-const TOKEN_BUDGET = 6000;
+const TOKEN_BUDGET_FULL = 6000;
+const TOKEN_BUDGET_CHECKPOINT = 3000;
 
 export type SynthesisMode = "checkpoint" | "full";
 
@@ -91,6 +93,33 @@ interface TruncationResult {
   excludedFiles: string[];
 }
 
+function slimExistingContext(context: string): string {
+  // For checkpoint mode: keep only sections the LLM needs to merge with
+  // Strip patterns, rejected, dependencies, project summary to save tokens
+  const lines = context.split("\n");
+  const keepSections = new Set(["Decisions", "Diagrams", "Project Brief Status", "Future Phases"]);
+  const result: string[] = [];
+  let inKeptSection = false;
+  let currentSection = "";
+
+  for (const line of lines) {
+    const sectionMatch = line.match(/^## (.+)/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1];
+      inKeptSection = keepSections.has(currentSection);
+    }
+    // Always keep meta header
+    if (line.startsWith("> ") || line.startsWith("# ")) {
+      result.push(line);
+      continue;
+    }
+    if (inKeptSection) {
+      result.push(line);
+    }
+  }
+  return result.join("\n");
+}
+
 async function truncateToTokenBudget(
   provider: ReturnType<typeof getProvider>,
   gitDiff: string,
@@ -99,11 +128,16 @@ async function truncateToTokenBudget(
   gitStatus: string,
   packageChanges: string | null,
   sessionNotes: string | null,
-  existingContext: string | null
+  existingContext: string | null,
+  mode: SynthesisMode = "full"
 ): Promise<TruncationResult> {
-  const overhead = [commitLog, gitStatus, packageChanges ?? "", sessionNotes ?? "", existingContext ?? ""].join("\n");
+  const tokenBudget = mode === "checkpoint" ? TOKEN_BUDGET_CHECKPOINT : TOKEN_BUDGET_FULL;
+  const contextForBudget = mode === "checkpoint" && existingContext
+    ? slimExistingContext(existingContext)
+    : existingContext;
+  const overhead = [commitLog, gitStatus, packageChanges ?? "", sessionNotes ?? "", contextForBudget ?? ""].join("\n");
   const overheadTokens = await provider.countTokens(overhead);
-  const totalBudget = TOKEN_BUDGET - overheadTokens;
+  const totalBudget = tokenBudget - overheadTokens;
 
   if (totalBudget <= 0) {
     return {
@@ -309,12 +343,13 @@ export async function synthesizeContext(
 
   // Read existing context if present
   let existingContext: string | null = null;
+  let existingParsed: LodestarContext | null = null;
   let resolvedQuestionsNote = "";
   try {
     existingContext = await fs.readFile(filePath, "utf-8");
 
     // Verify open questions against evidence
-    const existingParsed = parseMarkdown(existingContext);
+    existingParsed = parseMarkdown(existingContext);
     if (existingParsed.openQuestions.length > 0) {
       // Find last synthesis commit for evidence checking
       const { simpleGit } = await import("simple-git");
@@ -347,7 +382,8 @@ export async function synthesizeContext(
     gitResult.status,
     gitResult.packageChanges,
     input.sessionNotes ?? null,
-    existingContext
+    existingContext,
+    mode
   );
 
   if (wasTruncated) {
@@ -399,6 +435,15 @@ export async function synthesizeContext(
     console.error("[lodestar] Raw LLM response (first 500 chars):", raw.slice(0, 500));
     console.error("[lodestar] Raw LLM response (last 200 chars):", raw.slice(-200));
     return { success: false, path: filePath, summary: `Failed to parse LLM response: ${message}` };
+  }
+
+  // Override LLM date with actual date — LLMs often hallucinate dates
+  context.meta.date = new Date().toISOString().slice(0, 10);
+  context.meta.project = projectName;
+
+  // Merge with existing context to preserve accumulated data
+  if (existingParsed) {
+    context = mergeContexts(existingParsed, context);
   }
 
   // Rotate history before overwriting (failure doesn't block write)

@@ -1,0 +1,18 @@
+# Lodestar — Session Context
+
+This project uses Lodestar for session context management. A .lodestar.md file in the project root contains decisions, patterns, and open questions from previous coding sessions.
+
+## At the start of every session
+Call lodestar_load with projectRoot set to the workspace root. Read the returned context to understand what was decided previously.
+
+## At the end of every session
+Call lodestar_synthesize with projectRoot set to the workspace root. Include any notes the user mentions in sessionNotes.
+
+## Key commands
+- "lodestar start" / "load context" → call lodestar_load
+- "lodestar save" / "save session" → call lodestar_synthesize
+- "lodestar end" / "end session" → call lodestar_synthesize
+
+## Rules
+- Always use the workspace root as projectRoot
+- Don't modify .lodestar.md directly — only Lodestar writes to it

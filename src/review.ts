@@ -100,7 +100,7 @@ export async function runReview(options: {
       : null;
     const prd = await readPrd(resolved);
     const briefHtml = await readBriefHtml(resolved);
-    return renderReaderHTML(context, historyContext, prd, briefHtml);
+    return renderReaderHTML(context, historyContext, prd, briefHtml, resolved);
   }
 
   // Serve via HTTP — regenerates HTML on each request for fresh data

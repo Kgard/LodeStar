@@ -3,6 +3,8 @@
 import type { LodestarConfig, ProviderName } from "../config.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { OpenAIProvider } from "./openai.js";
+import { GoogleProvider } from "./google.js";
+import { AzureProvider } from "./azure.js";
 import { OllamaProvider } from "./ollama.js";
 
 export interface LLMProvider {
@@ -16,12 +18,16 @@ export interface LLMProvider {
 const CHECKPOINT_MODELS: Record<ProviderName, string> = {
   anthropic: "claude-haiku-4-5-20251001",
   openai: "gpt-4o-mini",
+  google: "gemini-2.5-flash",
+  azure: "gpt-4o-mini",
   ollama: "llama3.2",
 };
 
 const FULL_MODELS: Record<ProviderName, string> = {
   anthropic: "claude-sonnet-4-6",
   openai: "gpt-4o",
+  google: "gemini-2.5-pro",
+  azure: "gpt-4o",
   ollama: "llama3.2",
 };
 
@@ -35,6 +41,15 @@ export function getProvider(config: LodestarConfig, mode: "checkpoint" | "full" 
       return new AnthropicProvider(config.apiKey!, modelOverride);
     case "openai":
       return new OpenAIProvider(config.apiKey!, modelOverride);
+    case "google":
+      return new GoogleProvider(config.apiKey!, modelOverride);
+    case "azure":
+      return new AzureProvider(
+        config.apiKey!,
+        config.azureEndpoint ?? "",
+        modelOverride,
+        config.azureApiVersion
+      );
     case "ollama":
       return new OllamaProvider(
         modelOverride,

@@ -7,13 +7,15 @@ import fs from "node:fs/promises";
 const CONFIG_FILENAME = ".lodestar.config.json";
 const CONFIG_PATH = path.join(os.homedir(), CONFIG_FILENAME);
 
-export type ProviderName = "anthropic" | "openai" | "ollama";
+export type ProviderName = "anthropic" | "openai" | "google" | "azure" | "ollama";
 
 export interface LodestarConfig {
   provider: ProviderName;
   model: string;
   apiKey?: string;
   ollamaHost?: string;
+  azureEndpoint?: string;
+  azureApiVersion?: string;
 }
 
 export interface ConfigResult {

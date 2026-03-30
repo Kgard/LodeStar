@@ -10,6 +10,10 @@ export interface LodestarMeta {
 export interface LodestarDecision {
   decision: string;
   rationale: string;
+  status?: "active" | "superseded" | "outstanding";
+  group?: string;
+  session?: string;
+  supersededBy?: string;
   files?: string[];
 }
 
@@ -26,6 +30,7 @@ export interface LodestarDependency {
 export interface LodestarRejected {
   approach: string;
   reason: string;
+  type?: "failed" | "not-viable" | "scope";
 }
 
 export interface LodestarOpenQuestion {
@@ -169,8 +174,11 @@ export function contextToMarkdown(ctx: LodestarContext): string {
   }
   for (const d of ctx.decisions) {
     lines.push(`### ${d.decision}`);
-    lines.push("");
+    if (d.status) lines.push(`**Status:** ${d.status}`);
+    if (d.group) lines.push(`**Group:** ${d.group}`);
+    if (d.session) lines.push(`**Session:** ${d.session}`);
     lines.push(`**Rationale:** ${d.rationale}`);
+    if (d.supersededBy) lines.push(`**Superseded by:** ${d.supersededBy}`);
     if (d.files && d.files.length > 0) {
       lines.push(`**Files:** ${d.files.join(", ")}`);
     }
@@ -204,7 +212,7 @@ export function contextToMarkdown(ctx: LodestarContext): string {
   }
   for (const r of ctx.rejected) {
     lines.push(`### ${r.approach}`);
-    lines.push("");
+    if (r.type) lines.push(`**Type:** ${r.type}`);
     lines.push(`**Reason:** ${r.reason}`);
     lines.push("");
   }
@@ -397,9 +405,17 @@ export function parseMarkdown(content: string): LodestarContext {
     const body = titleEnd === -1 ? "" : chunk.slice(titleEnd);
     const rationaleMatch = body.match(/\*\*Rationale:\*\*\s*(.+)/);
     const filesMatch = body.match(/\*\*Files:\*\*\s*(.+)/);
+    const statusMatch = body.match(/\*\*Status:\*\*\s*(.+)/);
+    const groupMatch = body.match(/\*\*Group:\*\*\s*(.+)/);
+    const sessionMatch = body.match(/\*\*Session:\*\*\s*(.+)/);
+    const supersededByMatch = body.match(/\*\*Superseded by:\*\*\s*(.+)/);
     ctx.decisions.push({
       decision: title,
       rationale: rationaleMatch ? rationaleMatch[1].trim() : "",
+      ...(statusMatch ? { status: statusMatch[1].trim() as "active" | "superseded" | "outstanding" } : {}),
+      ...(groupMatch ? { group: groupMatch[1].trim() } : {}),
+      ...(sessionMatch ? { session: sessionMatch[1].trim() } : {}),
+      ...(supersededByMatch ? { supersededBy: supersededByMatch[1].trim() } : {}),
       ...(filesMatch
         ? { files: filesMatch[1].split(",").map((f) => f.trim()) }
         : {}),
@@ -436,9 +452,11 @@ export function parseMarkdown(content: string): LodestarContext {
     const title = titleEnd === -1 ? chunk.trim() : chunk.slice(0, titleEnd).trim();
     const body = titleEnd === -1 ? "" : chunk.slice(titleEnd);
     const reasonMatch = body.match(/\*\*Reason:\*\*\s*(.+)/);
+    const typeMatch = body.match(/\*\*Type:\*\*\s*(.+)/);
     ctx.rejected.push({
       approach: title,
       reason: reasonMatch ? reasonMatch[1].trim() : "",
+      ...(typeMatch ? { type: typeMatch[1].trim() as "failed" | "not-viable" | "scope" } : {}),
     });
   }
 

@@ -1,0 +1,71 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: macos-arm64
+          - os: macos-13
+            target: macos-x64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: windows-x64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run bundle
+
+      - run: node scripts/package.mjs --target=${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: bin/${{ matrix.target }}/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect binaries and generate checksums
+        run: |
+          mkdir -p release
+          for dir in artifacts/*/; do
+            target=$(basename "$dir")
+            if [ "$target" = "windows-x64" ]; then
+              tar -czf "release/lodestar-${target}.tar.gz" -C "$dir" lodestar.exe lodestar-mcp.exe
+            else
+              chmod +x "$dir/lodestar" "$dir/lodestar-mcp"
+              tar -czf "release/lodestar-${target}.tar.gz" -C "$dir" lodestar lodestar-mcp
+            fi
+          done
+          cd release
+          sha256sum *.tar.gz > SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

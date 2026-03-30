@@ -285,11 +285,20 @@ function markdownToHtml(md: string): string {
   return html;
 }
 
+function shortPath(projectRoot: string): string {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  const rel = projectRoot.startsWith(home) ? "~" + projectRoot.slice(home.length) : projectRoot;
+  const parts = rel.split("/").filter(Boolean);
+  if (parts.length <= 2) return parts.join("/");
+  return parts.slice(-2).join("/");
+}
+
 export function renderReaderHTML(
   context: LodestarContext | null,
   historyContext: LodestarContext | null,
   prd: { filename: string; content: string } | null = null,
-  briefHtml: string | null = null
+  briefHtml: string | null = null,
+  projectRoot: string = ""
 ): string {
   if (!context) {
     return `<!DOCTYPE html><html><head><title>Lodestar</title></head><body><h1>No .lodestar.md found</h1><p>Run <code>lodestar save</code> or <code>lodestar end</code> to create one.</p></body></html>`;
@@ -315,6 +324,21 @@ export function renderReaderHTML(
   const remaining = 100 - avgComplete;
 
   const diffHtml = historyContext ? renderDiffPanel(c, historyContext) : "";
+
+  // Derive current and last session dates from decision session fields
+  const sessionDates = [...new Set(c.decisions.map(d => d.session).filter(Boolean) as string[])].sort().reverse();
+  const currentSessionDate = sessionDates[0] ?? null;
+  const lastSessionDate = sessionDates[1] ?? null;
+
+  function decisionDot(session: string | undefined): string {
+    if (!session) return "";
+    if (currentSessionDate && session === currentSessionDate) return '<span class="session-dot current" title="Current session"></span>';
+    if (lastSessionDate && session === lastSessionDate) return '<span class="session-dot last" title="Last session"></span>';
+    return "";
+  }
+
+  const hasCurrentDots = currentSessionDate ? c.decisions.some(d => d.session === currentSessionDate) : false;
+  const hasLastDots = lastSessionDate ? c.decisions.some(d => d.session === lastSessionDate) : false;
 
   const firstNext = c.nextSession[0] ?? "No next-session guidance recorded.";
 
@@ -373,7 +397,7 @@ body {
   margin-bottom: 36px;
 }
 .logo { display: flex; align-items: center; }
-.logo svg { height: 84px; width: auto; }
+.logo svg { height: 105px; width: auto; }
 .project { font-size: 1.25rem; font-weight: 600; color: var(--navy); }
 .meta { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
 .summary {
@@ -445,8 +469,13 @@ body {
 .section-header .arrow { transition: transform 0.2s; }
 .section.open .section-header .arrow { transform: rotate(90deg); }
 .decision { margin-bottom: 1rem; }
-.decision-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.decision-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; }
 .decision-rationale { color: var(--text-muted); font-size: 0.9rem; }
+.session-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.session-dot.current { background: #185FA5; }
+.session-dot.last { background: #93B8E0; }
+.decision-legend { display: flex; gap: 1.25rem; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem; }
+.decision-legend-item { display: flex; align-items: center; gap: 0.35rem; }
 .decision-files { font-size: 0.8rem; color: var(--teal); margin-top: 0.25rem; }
 .item { padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 .item:last-child { border-bottom: none; }
@@ -937,8 +966,10 @@ h6 { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); margin: 0.
 <div class="container">
 
 <div class="header">
-  <span class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 72" width="130" height="36"><path d="M28,8 L29.9,41.1 L43,44 L29.9,46.9 L28,58 L26.1,46.9 L15,44 L26.1,41.1 Z" fill="#185FA5"/><text x="55" y="50" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="32" font-weight="500" letter-spacing="0.5" fill="#0C447C">Lodestar</text></svg></span>
+  <span class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="13 0 247 88" width="127" height="44"><path d="M28,8 L29.9,41.1 L43,44 L29.9,46.9 L28,58 L26.1,46.9 L15,44 L26.1,41.1 Z" fill="#185FA5"/><text x="55" y="50" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="32" font-weight="500" letter-spacing="0.5" fill="#0C447C">Lodestar</text><text x="57" y="68" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" font-weight="400" letter-spacing="0.8" fill="#888780">by Kylex</text></svg></span>
 </div>
+
+<h1 style="font-size:1.25rem;font-weight:600;color:var(--navy);margin:0 0 1rem 0;text-align:left">PROJECT: ${escapeHtml(projectRoot ? shortPath(projectRoot) : c.meta.project)}</h1>
 
 <div class="tabs">
   <div class="tab active" onclick="switchTab('summary')">Project Summary</div>
@@ -1058,7 +1089,7 @@ ${questionCount > 0 ? `
 </div>
 
 ${(c.diagrams ?? []).length > 0 ? `
-<div class="free-feature-card" id="arch-card">
+<div class="free-feature-card open" id="arch-card">
   <span class="free-badge">Free</span>
   <div class="free-feature-header" onclick="document.getElementById('arch-card').classList.toggle('open')">
     <span class="arrow" style="color:var(--teal)">&#9656;</span>
@@ -1090,18 +1121,39 @@ ${(c.diagrams ?? []).length > 0 ? `
   <div class="badge"><span class="badge-count" ${blockingCount > 0 ? 'style="color:var(--blocking)"' : ""}>${questionCount}</span><span class="badge-label">Questions</span></div>
 </div>
 
-<div class="section open">
-  <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+<div class="section open" id="decisions-section">
+  <div class="section-header" onclick="this.parentElement.classList.toggle('open');var o=document.getElementById('decisions-overflow'),s=document.getElementById('decisions-show-more');if(o&&!this.parentElement.classList.contains('open')){o.style.display='none';if(s)s.style.display='';}">
     <span><span class="arrow">&#9656;</span> Decisions</span>
     <span class="section-badge">${decisionCount}</span>
   </div>
   <div class="section-body">
-    ${c.decisions.length === 0 ? '<div class="item">No decisions recorded.</div>' : c.decisions.map((d) => `
+    ${hasCurrentDots || hasLastDots ? `<div class="decision-legend">${hasCurrentDots ? '<span class="decision-legend-item"><span class="session-dot current"></span> Current session</span>' : ""}${hasLastDots ? '<span class="decision-legend-item"><span class="session-dot last"></span> Last session</span>' : ""}<span class="decision-legend-item">No dot = older</span></div>` : ""}
+    ${c.decisions.length === 0 ? '<div class="item">No decisions recorded.</div>' : (() => {
+      const sorted = [...c.decisions].sort((a, b) => {
+        const aDate = a.session ?? "";
+        const bDate = b.session ?? "";
+        if (aDate === bDate) return 0;
+        if (aDate === currentSessionDate) return -1;
+        if (bDate === currentSessionDate) return 1;
+        if (aDate === lastSessionDate) return -1;
+        if (bDate === lastSessionDate) return 1;
+        return bDate.localeCompare(aDate);
+      });
+      const lastSessionEnd = sorted.reduce((max, d, i) => (d.session === currentSessionDate || d.session === lastSessionDate) ? i + 1 : max, 0);
+      const limit = Math.max(lastSessionEnd, 5);
+      const renderItem = (d: typeof sorted[0]) => `
     <div class="decision">
-      <div class="decision-title">${escapeHtml(d.decision)}</div>
+      <div class="decision-title">${decisionDot(d.session)}${escapeHtml(d.decision)}</div>
       <div class="decision-rationale">${escapeHtml(d.rationale)}</div>
       ${d.files && d.files.length > 0 ? `<div class="decision-files">${d.files.map((f) => escapeHtml(f)).join(", ")}</div>` : ""}
-    </div>`).join("")}
+    </div>`;
+      if (sorted.length <= limit) return sorted.map(renderItem).join("");
+      const visible = sorted.slice(0, limit).map(renderItem).join("");
+      const hidden = sorted.slice(limit).map(renderItem).join("");
+      const remaining = sorted.length - limit;
+      return visible + `<div id="decisions-overflow" style="display:none">${hidden}</div><div id="decisions-show-more" style="font-size:0.8rem;color:var(--teal);cursor:pointer;padding:0.5rem 0" onclick="document.getElementById('decisions-overflow').style.display='block';this.style.display='none'">Show ${remaining} more decisions</div>`
+;
+    })()}
   </div>
 </div>
 
@@ -1272,7 +1324,13 @@ document.addEventListener('DOMContentLoaded', function() {
       },
       securityLevel: 'loose'
     });
-    mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+    mermaid.run({ nodes: document.querySelectorAll('.mermaid') }).then(function() {
+      // Collapse the architecture card after Mermaid renders
+      setTimeout(function() {
+        var card = document.getElementById('arch-card');
+        if (card) card.classList.remove('open');
+      }, 500);
+    });
   }
 });
 </script>

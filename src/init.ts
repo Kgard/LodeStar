@@ -257,6 +257,66 @@ async function validateOpenAIKey(apiKey: string): Promise<boolean> {
   }
 }
 
+async function validateGoogleKey(apiKey: string): Promise<boolean> {
+  try {
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const client = new GoogleGenerativeAI(apiKey);
+    const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
+    await model.generateContent("hi");
+    return true;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("API_KEY_INVALID") || message.includes("401") || message.includes("403")) {
+      return false;
+    }
+    return true;
+  }
+}
+
+async function validateAzure(apiKey: string, endpoint: string): Promise<boolean> {
+  try {
+    const { AzureOpenAI } = await import("openai");
+    const client = new AzureOpenAI({
+      apiKey,
+      endpoint,
+      apiVersion: "2024-12-01-preview",
+    });
+    await client.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 1,
+      messages: [{ role: "user", content: "hi" }],
+    });
+    return true;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("401") || message.includes("403") || message.includes("Unauthorized")) {
+      return false;
+    }
+    return true;
+  }
+}
+
+async function setupAzure(): Promise<{ apiKey: string; endpoint: string }> {
+  const endpoint = await input({
+    message: "Azure OpenAI endpoint URL (e.g. https://your-resource.openai.azure.com):",
+  });
+
+  const apiKey = await input({
+    message: "Azure OpenAI API key:",
+  });
+
+  console.error("Validating connection...");
+  const valid = await validateAzure(apiKey.trim(), endpoint.trim());
+
+  if (!valid) {
+    console.error("✗ Could not authenticate. Check your endpoint and key.\n");
+  } else {
+    console.error("✓ Connected\n");
+  }
+
+  return { apiKey: apiKey.trim(), endpoint: endpoint.trim() };
+}
+
 async function validateOllama(host: string): Promise<boolean> {
   try {
     const response = await fetch(`${host}/api/tags`);
@@ -355,16 +415,7 @@ async function setupOllama(): Promise<{ model: string; host: string }> {
   return { model, host };
 }
 
-async function offerFirstSynthesize(): Promise<void> {
-  const wantsSynthesize = await confirm({
-    message: "Do you have a project you'd like to connect?",
-    default: true,
-  });
-
-  if (!wantsSynthesize) {
-    return;
-  }
-
+async function resolveProjectPath(): Promise<string | null> {
   while (true) {
     const projectPath = await input({
       message: "Path to your project (or press Enter for current directory):",
@@ -373,291 +424,495 @@ async function offerFirstSynthesize(): Promise<void> {
 
     const resolved = path.resolve(projectPath);
 
-    // Check directory exists
     try {
       const stat = await fs.stat(resolved);
       if (!stat.isDirectory()) {
         console.error(`✗ ${resolved} is not a directory.\n`);
         const retry = await confirm({ message: "Try a different path?", default: true });
-        if (!retry) return;
+        if (!retry) return null;
         continue;
       }
     } catch {
       console.error(`✗ ${resolved} does not exist.\n`);
       const retry = await confirm({ message: "Try a different path?", default: true });
-      if (!retry) return;
+      if (!retry) return null;
       continue;
     }
 
-    // Check if .lodestar.md already exists
-    let hasLodestar = false;
-    try {
-      await fs.access(path.join(resolved, ".lodestar.md"));
-      hasLodestar = true;
-    } catch {
-      // No existing context
-    }
+    return resolved;
+  }
+}
 
-    if (hasLodestar) {
-      // Existing context — offer full synthesis
-      console.error(`\nFound existing .lodestar.md — running full synthesis...`);
+async function hasExistingCode(projectRoot: string): Promise<boolean> {
+  try {
+    const entries = await fs.readdir(projectRoot);
+    return entries.some((e) => e === "package.json" || e === "Cargo.toml" || e === "pyproject.toml" || e === "go.mod" || e === "src");
+  } catch {
+    return false;
+  }
+}
+
+async function hasLodestarContext(projectRoot: string): Promise<boolean> {
+  try {
+    await fs.access(path.join(projectRoot, ".lodestar.md"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function isGitInstalled(): Promise<boolean> {
+  try {
+    const { execSync } = await import("node:child_process");
+    execSync("git --version", { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function installGitViaBrew(): Promise<boolean> {
+  try {
+    const { execSync } = await import("node:child_process");
+    // Check if brew is available
+    execSync("brew --version", { stdio: "ignore" });
+    console.error("Installing git via Homebrew...\n");
+    execSync("brew install git", { stdio: "inherit" });
+    console.error("\n✓ Git installed\n");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getGitVersion(): string | null {
+  try {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    const output = execSync("git --version", { encoding: "utf-8" }).trim();
+    // "git version 2.39.0" → "2.39.0"
+    const match = output.match(/(\d+\.\d+\.\d+)/);
+    return match ? match[1] : output;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureGitInstalled(): Promise<boolean> {
+  if (await isGitInstalled()) return true;
+
+  console.error("\n  Git is required for Lodestar to track changes between sessions.\n");
+
+  const platform = process.platform;
+
+  if (platform === "darwin") {
+    const action = await select({
+      message: "Git is not installed. How would you like to install it?",
+      choices: [
+        { name: "Install via Homebrew (recommended)", value: "brew" },
+        { name: "Install via Xcode Command Line Tools", value: "xcode" },
+        { name: "I'll install it myself", value: "manual" },
+      ],
+    });
+
+    if (action === "brew") {
+      const success = await installGitViaBrew();
+      if (!success) {
+        console.error("✗ Homebrew not found or install failed.\n");
+        console.error("  Install Homebrew first: https://brew.sh\n");
+        console.error("  Then re-run: lodestar init\n");
+        return false;
+      }
+      const version = getGitVersion();
+      console.error(`✓ Git installed${version ? ` (v${version})` : ""}\n`);
+      const cont = await confirm({ message: "Continue with Lodestar setup?", default: true });
+      return cont;
+    } else if (action === "xcode") {
+      console.error("\nRunning: xcode-select --install\n");
+      try {
+        const { execSync } = await import("node:child_process");
+        execSync("xcode-select --install", { stdio: "inherit" });
+      } catch {
+        // The command opens a system dialog — "error" is expected
+      }
+      // Wait and check if it worked
+      console.error("\nChecking for git...");
+      // Give the user a moment
+      await input({ message: "Press Enter once the Xcode install completes..." });
+      if (await isGitInstalled()) {
+        const version = getGitVersion();
+        console.error(`✓ Git installed${version ? ` (v${version})` : ""}\n`);
+        const cont = await confirm({ message: "Continue with Lodestar setup?", default: true });
+        return cont;
+      }
+      console.error("✗ Git still not found. Re-run lodestar init after installation completes.\n");
+      return false;
+    } else {
+      console.error("\n  Install git from https://git-scm.com/download");
+      console.error("  Then re-run: lodestar init\n");
+      return false;
+    }
+  } else if (platform === "linux") {
+    console.error("  Install git with your package manager:");
+    console.error("    Ubuntu/Debian: sudo apt install git");
+    console.error("    Fedora: sudo dnf install git");
+    console.error("    Arch: sudo pacman -S git\n");
+    console.error("  Then re-run: lodestar init\n");
+    return false;
+  } else {
+    console.error("  Install git from https://git-scm.com/download");
+    console.error("  Then re-run: lodestar init\n");
+    return false;
+  }
+}
+
+async function isGitRepo(projectRoot: string): Promise<boolean> {
+  try {
+    const { simpleGit } = await import("simple-git");
+    const git = simpleGit(projectRoot);
+    return await git.checkIsRepo();
+  } catch {
+    return false;
+  }
+}
+
+async function ensureGitRepo(projectRoot: string): Promise<boolean> {
+  if (await isGitRepo(projectRoot)) return true;
+
+  console.error(`\n  This directory is not a git repository.`);
+  console.error(`  Lodestar uses git to track changes between sessions.\n`);
+
+  const shouldInit = await confirm({
+    message: "Initialize a git repository here?",
+    default: true,
+  });
+
+  if (!shouldInit) {
+    console.error("\n⚠ Lodestar requires git. You can run 'git init' later and re-run 'lodestar init'.\n");
+    return false;
+  }
+
+  try {
+    const { simpleGit } = await import("simple-git");
+    const git = simpleGit(projectRoot);
+    await git.init();
+    console.error("✓ Git repository initialized\n");
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`✗ Could not initialize git: ${msg}\n`);
+    return false;
+  }
+}
+
+// Tracks the project path chosen during init for use in hooks and completion message
+let onboardedProjectPath: string | null = null;
+
+async function onboardProject(): Promise<void> {
+  const projectType = await select({
+    message: "What kind of project?",
+    choices: [
+      { name: "New project — I'm starting fresh", value: "new" },
+      { name: "Existing project — I have code already", value: "existing" },
+    ],
+  });
+
+  const resolved = await resolveProjectPath();
+  if (!resolved) return;
+
+  // Ensure git is set up
+  const gitReady = await ensureGitRepo(resolved);
+  if (!gitReady) return;
+
+  onboardedProjectPath = resolved;
+
+  if (projectType === "existing") {
+    const hasContext = await hasLodestarContext(resolved);
+    const hasCode = await hasExistingCode(resolved);
+
+    if (hasContext) {
+      console.error(`\nFound existing .lodestar.md — running synthesis to refresh...`);
       const result = await synthesizeContext({ projectRoot: resolved });
       if (!result.success) {
         console.error(`✗ ${result.summary}\n`);
-        const retry = await confirm({ message: "Try a different project?", default: true });
-        if (!retry) return;
-        continue;
+        return;
       }
       console.error(`✓ ${result.summary}`);
       console.error(`  Written to ${result.path}`);
-    } else {
-      // No context — check if project has existing code
-      let hasCode = false;
-      try {
-        const entries = await fs.readdir(resolved);
-        hasCode = entries.some((e) => e === "package.json" || e === "Cargo.toml" || e === "pyproject.toml" || e === "go.mod" || e === "src");
-      } catch {
-        hasCode = false;
-      }
+    } else if (hasCode) {
+      console.error(`\n  This project has existing code but no .lodestar.md.\n`);
 
-      if (hasCode) {
-        // Existing project, no context — bootstrap first
-        console.error(`\n  This project has existing code but no .lodestar.md.`);
-        console.error(`  Lodestar will capture your project structure now.`);
-        console.error(`  Note: decisions and rationale will improve after your`);
-        console.error(`  first real coding session.\n`);
+      const mode = await select({
+        message: "How should Lodestar analyze your project?",
+        choices: [
+          { name: "Quick scan — capture project structure (no AI cost)", value: "bootstrap" },
+          { name: "Full analysis — AI reads your code and generates a project brief", value: "synthesize" },
+        ],
+      });
 
+      if (mode === "bootstrap") {
         const { bootstrap } = await import("./bootstrap.js");
         const result = await bootstrap(resolved);
-
         if (!result.success) {
           console.error(`✗ ${result.summary}\n`);
-          const retry = await confirm({ message: "Try a different project?", default: true });
-          if (!retry) return;
-          continue;
+          return;
         }
         console.error(`✓ ${result.summary}`);
         console.error(`  Written to ${result.path}`);
       } else {
-        // New/empty project — run full synthesis
         console.error(`\nSynthesizing ${resolved} ...`);
         const result = await synthesizeContext({ projectRoot: resolved });
         if (!result.success) {
           console.error(`✗ ${result.summary}\n`);
-          const retry = await confirm({ message: "Try a different project?", default: true });
-          if (!retry) return;
-          continue;
+          return;
         }
         console.error(`✓ ${result.summary}`);
         console.error(`  Written to ${result.path}`);
       }
+    } else {
+      console.error(`\nNo existing code detected — treating as a new project.`);
+      console.error(`Lodestar will capture context after your first coding session.\n`);
     }
-    console.error("");
-    return;
+  } else {
+    console.error(`\nLodestar will capture context after your first coding session.\n`);
   }
+
+  console.error("");
 }
 
 export async function runInit(): Promise<void> {
   console.error(BANNER);
 
-  // Check for existing config
+  // Step 0: Ensure git is installed
+  const gitInstalled = await ensureGitInstalled();
+  if (!gitInstalled) return;
+
+  // Step 1: Check for existing config
   const existing = await readConfig();
+  let needsApiSetup = true;
+
   if (existing.config) {
     console.error(`Existing config found: ${existing.config.provider} (${existing.config.model})\n`);
 
     const action = await select({
       message: "What would you like to do?",
       choices: [
-        { name: "Keep current config — just reconfigure coding tools", value: "keep" },
+        { name: "Keep current config", value: "keep" },
         { name: "Switch provider or update API key", value: "reconfigure" },
       ],
     });
 
     if (action === "keep") {
       console.error(`\n✓ Keeping existing config\n`);
-      await setupToolIntegration();
-      await offerFirstSynthesize();
+      needsApiSetup = false;
+    }
+  }
 
-      const wantsHooks = await confirm({
-        message: "Install git hooks? (auto-updates on commit, full synthesis on push)",
-        default: true,
-      });
-      if (wantsHooks) {
-        const { installHooks } = await import("./hooks.js");
-        const results = await installHooks(process.cwd());
-        for (const r of results) {
-          console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
+  // Step 2: API onboarding (if needed)
+  if (needsApiSetup) {
+    const provider = await select<ProviderName>({
+      message: "Which AI provider do you use for coding?",
+      choices: [
+        { name: "Anthropic (Claude) — recommended", value: "anthropic" },
+        { name: "OpenAI (GPT-4o, o3)", value: "openai" },
+        { name: "Google (Gemini 2.5 Pro)", value: "google" },
+        { name: "Azure OpenAI", value: "azure" },
+        { name: "Ollama (local — no API key needed)", value: "ollama" },
+      ],
+    });
+
+    let config: LodestarConfig;
+
+    // Reuse existing API key if same provider selected
+    const reuseKey =
+      existing.config &&
+      existing.config.provider === provider &&
+      existing.config.apiKey;
+
+    switch (provider) {
+      case "anthropic": {
+        let apiKey: string;
+        if (reuseKey) {
+          console.error("\n✓ Reusing existing Anthropic API key\n");
+          apiKey = existing.config!.apiKey!;
+        } else {
+          apiKey = await getApiKey(
+            "an Anthropic",
+            "https://console.anthropic.com/settings/keys",
+            validateAnthropicKey
+          );
         }
+        config = { provider: "anthropic", model: "claude-sonnet-4-6", apiKey };
+        break;
       }
-
-      console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Lodestar is ready.
-
-  lodestar start       Load context from your last session
-  lodestar save        Save a mid-session checkpoint
-  lodestar end         Done for the day — save and commit
-
-Or just tell your AI: "lodestar start" / "lodestar end"
-
-Sign up for Kylex updates: kylex.io
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      return;
+      case "openai": {
+        let apiKey: string;
+        if (reuseKey) {
+          console.error("\n✓ Reusing existing OpenAI API key\n");
+          apiKey = existing.config!.apiKey!;
+        } else {
+          apiKey = await getApiKey(
+            "an OpenAI",
+            "https://platform.openai.com/api-keys",
+            validateOpenAIKey
+          );
+        }
+        config = { provider: "openai", model: "gpt-4o", apiKey };
+        break;
+      }
+      case "google": {
+        let apiKey: string;
+        if (reuseKey) {
+          console.error("\n✓ Reusing existing Google API key\n");
+          apiKey = existing.config!.apiKey!;
+        } else {
+          apiKey = await getApiKey(
+            "a Google AI",
+            "https://aistudio.google.com/apikey",
+            validateGoogleKey
+          );
+        }
+        config = { provider: "google", model: "gemini-2.5-pro", apiKey };
+        break;
+      }
+      case "azure": {
+        const azure = await setupAzure();
+        config = {
+          provider: "azure",
+          model: "gpt-4o",
+          apiKey: azure.apiKey,
+          azureEndpoint: azure.endpoint,
+          azureApiVersion: "2024-12-01-preview",
+        };
+        break;
+      }
+      case "ollama": {
+        const { model, host } = await setupOllama();
+        config = { provider: "ollama", model, ollamaHost: host };
+        break;
+      }
     }
+
+    await writeConfig(config);
+    console.error(`✓ Config saved to ${getConfigPath()}\n`);
   }
 
-  const provider = await select<ProviderName>({
-    message: "Which AI provider do you use for coding?",
-    choices: [
-      { name: "Anthropic (Claude) — recommended", value: "anthropic" },
-      { name: "OpenAI (GPT-4o, o3)", value: "openai" },
-      { name: "Ollama (local — no API key needed)", value: "ollama" },
-    ],
-  });
+  // Step 3: New or existing project?
+  await onboardProject();
 
-  let config: LodestarConfig;
-
-  // Reuse existing API key if same provider selected
-  const reuseKey =
-    existing.config &&
-    existing.config.provider === provider &&
-    existing.config.apiKey;
-
-  switch (provider) {
-    case "anthropic": {
-      let apiKey: string;
-      if (reuseKey) {
-        console.error("\n✓ Reusing existing Anthropic API key\n");
-        apiKey = existing.config!.apiKey!;
-      } else {
-        apiKey = await getApiKey(
-          "an Anthropic",
-          "https://console.anthropic.com/settings/keys",
-          validateAnthropicKey
-        );
-      }
-      config = { provider: "anthropic", model: "claude-sonnet-4-6", apiKey };
-      break;
-    }
-    case "openai": {
-      let apiKey: string;
-      if (reuseKey) {
-        console.error("\n✓ Reusing existing OpenAI API key\n");
-        apiKey = existing.config!.apiKey!;
-      } else {
-        apiKey = await getApiKey(
-          "an OpenAI",
-          "https://platform.openai.com/api-keys",
-          validateOpenAIKey
-        );
-      }
-      config = { provider: "openai", model: "gpt-4o", apiKey };
-      break;
-    }
-    case "ollama": {
-      const { model, host } = await setupOllama();
-      config = { provider: "ollama", model, ollamaHost: host };
-      break;
-    }
-  }
-
-  await writeConfig(config);
-  console.error(`✓ Config saved to ${getConfigPath()}\n`);
-
-  // Auto-configure coding tools
+  // Step 4: Configure coding tools
   await setupToolIntegration();
 
-  // Offer first synthesis on an active project
-  await offerFirstSynthesize();
+  // Step 5: Auto-install all hooks
+  console.error("Installing hooks...\n");
 
-  // Offer git hooks
-  const wantsHooks = await confirm({
-    message: "Install git hooks? (auto-updates on commit, full synthesis on push)",
-    default: true,
-  });
-
-  if (wantsHooks) {
+  // Git hooks — install in the project directory
+  const hookRoot = onboardedProjectPath ?? process.cwd();
+  let gitHooksInstalled = false;
+  try {
     const { installHooks } = await import("./hooks.js");
-    const hookRoot = process.cwd();
     const results = await installHooks(hookRoot);
     for (const r of results) {
       console.error(`${r.installed ? "✓" : "✗"} ${r.message}`);
     }
+    gitHooksInstalled = results.some((r) => r.installed);
+  } catch {
+    console.error("⚠ Could not install git hooks — you can add them later with lodestar hooks");
   }
 
-  // Offer Claude Code session hooks
-  const wantsAutoHooks = await confirm({
-    message: "Enable automatic session management for Claude Code? (auto-load on start, auto-save on close)",
-    default: true,
-  });
+  // Claude Code session hooks — auto-install in the project directory
+  let sessionHooksInstalled = false;
+  const claudeSettingsDir = path.join(hookRoot, ".claude");
+  const claudeSettingsPath = path.join(claudeSettingsDir, "settings.json");
+  try {
+    await fs.mkdir(claudeSettingsDir, { recursive: true });
 
-  if (wantsAutoHooks) {
+    let settings: Record<string, unknown> = {};
     try {
-      const settingsDir = path.join(process.cwd(), ".claude");
-      await fs.mkdir(settingsDir, { recursive: true });
-      const settingsPath = path.join(settingsDir, "settings.json");
-
-      let settings: Record<string, unknown> = {};
-      try {
-        const raw = await fs.readFile(settingsPath, "utf-8");
-        settings = JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        // New file
-      }
-
-      const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
-
-      // SessionStart hook — load context + print summary
-      const sessionStart = (hooks.SessionStart ?? []) as Array<Record<string, unknown>>;
-      const startInstalled = sessionStart.some((h) =>
-        typeof h.command === "string" && h.command.includes("lodestar")
-      );
-      if (!startInstalled) {
-        sessionStart.push({
-          command: "lodestar summary --project .",
-          event: "SessionStart",
-        });
-        hooks.SessionStart = sessionStart;
-      }
-
-      // SessionEnd hook — auto-save context
-      const sessionEnd = (hooks.SessionEnd ?? []) as Array<Record<string, unknown>>;
-      const endInstalled = sessionEnd.some((h) =>
-        typeof h.command === "string" && h.command.includes("lodestar")
-      );
-      if (!endInstalled) {
-        sessionEnd.push({
-          command: "lodestar end --project .",
-          event: "SessionEnd",
-        });
-        hooks.SessionEnd = sessionEnd;
-      }
-
-      settings.hooks = hooks;
-      await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
-
-      if (!startInstalled || !endInstalled) {
-        console.error("✓ Claude Code hooks installed:");
-        console.error("    SessionStart → loads context + prints summary");
-        console.error("    SessionEnd  → auto-saves + commits context");
-        console.error("  You never need to run lodestar start/end manually.");
-      } else {
-        console.error("✓ Claude Code hooks already installed");
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`⚠ Could not install Claude Code hooks: ${msg}`);
+      const raw = await fs.readFile(claudeSettingsPath, "utf-8");
+      settings = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      // New file
     }
+
+    const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
+
+    const sessionStart = (hooks.SessionStart ?? []) as Array<Record<string, unknown>>;
+    const startInstalled = sessionStart.some((h) =>
+      typeof h.command === "string" && h.command.includes("lodestar")
+    );
+    if (!startInstalled) {
+      sessionStart.push({
+        command: "lodestar summary --project .",
+        event: "SessionStart",
+      });
+      hooks.SessionStart = sessionStart;
+    }
+
+    const sessionEnd = (hooks.SessionEnd ?? []) as Array<Record<string, unknown>>;
+    const endInstalled = sessionEnd.some((h) =>
+      typeof h.command === "string" && h.command.includes("lodestar")
+    );
+    if (!endInstalled) {
+      sessionEnd.push({
+        command: "lodestar end --project .",
+        event: "SessionEnd",
+      });
+      hooks.SessionEnd = sessionEnd;
+    }
+
+    settings.hooks = hooks;
+    await fs.writeFile(claudeSettingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+
+    if (!startInstalled || !endInstalled) {
+      console.error("✓ Claude Code session hooks installed (auto-load + auto-save)");
+      sessionHooksInstalled = true;
+    } else {
+      console.error("✓ Claude Code session hooks already installed");
+      sessionHooksInstalled = true;
+    }
+  } catch {
+    // Claude Code not available — not an error
   }
 
-  console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Lodestar is ready.
+  // Step 6: Completion message
+  const projectDisplay = onboardedProjectPath ?? process.cwd();
+  const hasClaudeDesktop = (await detectInstalledTools()).some((t) => t.name === "Claude Desktop");
 
-  lodestar start       Load context from your last session
-  lodestar save        Save a mid-session checkpoint
-  lodestar end         Done for the day — save and commit
+  console.error("");
+  if (sessionHooksInstalled) {
+    console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lodestar is ready. Sessions are managed automatically.
 
-Or just tell your AI: "lodestar start" / "lodestar end"
+  Project: ${projectDisplay}
 
+  lodestar review      Open the project dashboard
+  lodestar save        Manual checkpoint (optional)
+${hasClaudeDesktop ? `
+  ⚠ Restart Claude Desktop to activate the MCP connection.
+    After restarting, you can ask Claude to "load lodestar context"
+    or "synthesize this session" and it will use the MCP tools.
+` : ""}${gitHooksInstalled ? "  Git hooks active — auto-updates on commit, full sync on push.\n" : ""}
 Sign up for Kylex updates: kylex.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  } else {
+    // No session hooks — user needs to know about manual commands
+    console.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Lodestar is ready.
+
+  Project: ${projectDisplay}
+
+Your tool doesn't support session hooks yet, so manage
+sessions manually:
+
+  lodestar start       Load context at the start of a session
+  lodestar end         Save + commit at the end of a session
+  lodestar review      Open the project dashboard
+${hasClaudeDesktop ? `
+  ⚠ Restart Claude Desktop to activate the MCP connection.
+    After restarting, you can ask Claude to "load lodestar context"
+    or "synthesize this session" and it will use the MCP tools.
+` : ""}${gitHooksInstalled ? "  Git hooks active — auto-updates on commit, full sync on push.\n" : ""}
+Sign up for Kylex updates: kylex.io
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  }
 }

@@ -9,6 +9,10 @@ import {
 import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 import { diff } from "./diff.js";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+const LOCK_FILENAME = ".lodestar.synthesizing";
 
 const server = new Server(
   { name: "lodestar", version: "0.1.0" },
@@ -20,7 +24,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "lodestar_synthesize",
       description:
-        "Synthesize the current coding session into a .lodestar.md context file. Captures decisions, patterns, rejected approaches, and open questions from git diffs. Call this when the user says 'lodestar save', 'lodestar end', 'save session', 'synthesize', or 'end session'. projectRoot should be the workspace root directory.",
+        "Synthesize the current coding session into a .lodestar.md context file. This runs the CLI in the background for full-quality synthesis (avoids MCP timeout on large diffs). Returns immediately — the .lodestar.md file will be updated within 1-2 minutes. Call this when the user says 'lodestar save', 'lodestar end', 'save session', 'synthesize', or 'end session'. projectRoot should be the workspace root directory.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -45,6 +49,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           projectRoot: {
             type: "string",
             description: "Absolute path to the project directory. Use the workspace root. Defaults to current working directory if omitted.",
+          },
+        },
+      },
+    },
+    {
+      name: "lodestar_status",
+      description:
+        "Check if a background synthesis is still running and when .lodestar.md was last updated. Call this after lodestar_synthesize to check progress. If synthesis is complete, call lodestar_load to get the updated context.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          projectRoot: {
+            type: "string",
+            description: "Absolute path to the project directory.",
           },
         },
       },
@@ -77,9 +95,76 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const projectRoot = (args?.projectRoot as string) || process.cwd();
       const sessionNotes = args?.sessionNotes as string | undefined;
 
-      const result = await synthesizeContext({ projectRoot, sessionNotes });
+      // Write lock file to track synthesis status
+      const lockPath = path.join(projectRoot, LOCK_FILENAME);
+      const startTime = new Date().toISOString();
+      await fs.writeFile(lockPath, startTime, "utf-8");
+
+      // Spawn CLI in background for full-quality Sonnet synthesis
+      // Returns immediately to avoid MCP client timeout
+      // Lock file is cleaned up by a wrapper that runs after the CLI
+      const { spawn } = await import("node:child_process");
+      const cliPath = new URL("cli.js", import.meta.url).pathname;
+      const cliArgs = ["end", projectRoot];
+      if (sessionNotes) {
+        cliArgs.push(`--notes=${sessionNotes}`);
+      }
+      // Wrap in a shell command that removes the lock file when done
+      const cmd = `node "${cliPath}" ${cliArgs.map(a => `"${a}"`).join(" ")}; rm -f "${lockPath}"`;
+      const child = spawn("sh", ["-c", cmd], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify({
+          success: true,
+          path: `${projectRoot}/.lodestar.md`,
+          summary: "Synthesis started in background — full-quality Sonnet synthesis. Call lodestar_status to check progress, then lodestar_load when complete.",
+        }, null, 2) }],
+      };
+    }
+
+    case "lodestar_status": {
+      const projectRoot = (args?.projectRoot as string) || process.cwd();
+      const lockPath = path.join(projectRoot, LOCK_FILENAME);
+      const lodestarPath = path.join(projectRoot, ".lodestar.md");
+
+      let synthesizing = false;
+      let startedAt: string | null = null;
+      try {
+        startedAt = await fs.readFile(lockPath, "utf-8");
+        synthesizing = true;
+      } catch {
+        // No lock file — not synthesizing
+      }
+
+      let lastUpdated: string | null = null;
+      try {
+        const stat = await fs.stat(lodestarPath);
+        lastUpdated = stat.mtime.toISOString();
+      } catch {
+        // No .lodestar.md yet
+      }
+
+      let elapsed = "";
+      if (synthesizing && startedAt) {
+        const seconds = Math.round((Date.now() - new Date(startedAt).getTime()) / 1000);
+        elapsed = `${seconds}s elapsed`;
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify({
+          synthesizing,
+          ...(elapsed ? { elapsed } : {}),
+          lastUpdated,
+          message: synthesizing
+            ? `Synthesis in progress (${elapsed}). Call lodestar_status again in 30 seconds to check, or call lodestar_load once complete.`
+            : lastUpdated
+              ? "No synthesis running. Context is ready — call lodestar_load to read it."
+              : "No synthesis running and no .lodestar.md found. Call lodestar_synthesize to create one.",
+        }, null, 2) }],
       };
     }
 
