@@ -9,6 +9,32 @@ import { simpleGit } from "simple-git";
 import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 import { addNote, getNotes, clearNotes } from "./notes.js";
+import type { SimpleGit } from "simple-git";
+
+async function commitAndPush(git: SimpleGit, message: string): Promise<void> {
+  try {
+    await git.add(".lodestar.md");
+    await git.commit(message);
+    console.error(`\n✓ Committed .lodestar.md`);
+
+    try {
+      await git.push();
+      console.error(`✓ Pushed to remote`);
+    } catch (pushErr) {
+      const pushMsg = pushErr instanceof Error ? pushErr.message : String(pushErr);
+      console.error(`⚠ Could not push: ${pushMsg}`);
+      console.error(`  You can push manually: git push`);
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes("nothing to commit") || message.includes("no changes added")) {
+      console.error(`\n✓ .lodestar.md already up to date — nothing to commit`);
+    } else {
+      console.error(`\n⚠ Could not commit .lodestar.md: ${message}`);
+      console.error(`  You can commit it manually: git add .lodestar.md && git commit -m "update session context"`);
+    }
+  }
+}
 
 function askNote(): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
@@ -185,39 +211,20 @@ async function runEnd(args: string[]): Promise<void> {
     projectPath = args[projectIdx + 1];
   }
   const projectRoot = path.resolve(projectPath);
+  const git = simpleGit(projectRoot);
 
-  // Step 1: Synthesize with full model (end-of-session)
+  // Step 1: Commit + push any pending .lodestar.md changes before synthesis
+  // Ensures a fresh commit timestamp exists even if synthesis fails or is interrupted
+  await commitAndPush(git, "chore: update session context");
+
+  // Step 2: Synthesize with full model (end-of-session)
   const success = await runSave(args, "full");
   if (!success) {
     process.exit(1);
   }
 
-  // Step 2: Commit .lodestar.md
-  const git = simpleGit(projectRoot);
-
-  try {
-    await git.add(".lodestar.md");
-    await git.commit("chore: update session context via lodestar end");
-    console.error(`\n✓ Committed .lodestar.md`);
-
-    // Step 3: Push to remote so the commit timestamp is current
-    try {
-      await git.push();
-      console.error(`✓ Pushed to remote`);
-    } catch (pushErr) {
-      const pushMsg = pushErr instanceof Error ? pushErr.message : String(pushErr);
-      console.error(`⚠ Could not push: ${pushMsg}`);
-      console.error(`  You can push manually: git push`);
-    }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (message.includes("nothing to commit") || message.includes("no changes added")) {
-      console.error(`\n✓ .lodestar.md already up to date — nothing to commit`);
-    } else {
-      console.error(`\n⚠ Could not commit .lodestar.md: ${message}`);
-      console.error(`  You can commit it manually: git add .lodestar.md && git commit -m "update session context"`);
-    }
-  }
+  // Step 3: Commit + push the newly synthesized .lodestar.md
+  await commitAndPush(git, "chore: update session context via lodestar end");
 
   // Clear accumulated notes — session is over
   await clearNotes(projectRoot);
