@@ -9,7 +9,26 @@ import { simpleGit } from "simple-git";
 import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 import { addNote, getNotes, clearNotes } from "./notes.js";
+import { readConfig } from "./config.js";
 import type { SimpleGit } from "simple-git";
+
+async function resolveProject(pathArg: string | undefined): Promise<string> {
+  if (pathArg) return path.resolve(pathArg);
+
+  // Check if CWD has a .lodestar.md
+  const cwd = process.cwd();
+  try {
+    await fs.access(path.join(cwd, ".lodestar.md"));
+    return cwd;
+  } catch {
+    // No .lodestar.md in CWD — fall back to last onboarded project
+    const result = await readConfig();
+    if (result.config?.lastProject) {
+      return result.config.lastProject;
+    }
+    return cwd;
+  }
+}
 
 async function commitAndPush(git: SimpleGit, message: string): Promise<void> {
   try {
@@ -86,7 +105,7 @@ async function isFirstRun(projectRoot: string): Promise<boolean> {
 }
 
 async function runStart(args: string[]): Promise<void> {
-  const projectRoot = path.resolve(args[0] ?? process.cwd());
+  const projectRoot = await resolveProject(args[0]);
 
   const result = await load(projectRoot);
 
@@ -150,7 +169,7 @@ async function runStart(args: string[]): Promise<void> {
 async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promise<boolean> {
   const isQuick = args.includes("--quick");
   const pathArgs = args.filter((a) => !a.startsWith("--"));
-  const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
+  const projectRoot = await resolveProject(pathArgs[0]);
 
   if (isQuick) {
     // Quick mode: update feature status from recent commit, no LLM call
@@ -199,18 +218,19 @@ async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promi
 }
 
 async function runEnd(args: string[]): Promise<void> {
-  const projectFlag = args.find((a) => a.startsWith("--project=") || a.startsWith("--project "));
-  const pathArgs = args.filter((a) => !a.startsWith("--"));
-  let projectPath = pathArgs[0] ?? process.cwd();
-  if (projectFlag) {
-    projectPath = projectFlag.split("=")[1] ?? pathArgs[0] ?? process.cwd();
-  }
-  // Also handle --project as separate arg
+  const projectFlag = args.find((a) => a.startsWith("--project="));
   const projectIdx = args.indexOf("--project");
-  if (projectIdx !== -1 && args[projectIdx + 1]) {
-    projectPath = args[projectIdx + 1];
+  const pathArgs = args.filter((a) => !a.startsWith("--"));
+
+  let explicitPath: string | undefined;
+  if (projectFlag) {
+    explicitPath = projectFlag.split("=")[1];
+  } else if (projectIdx !== -1 && args[projectIdx + 1]) {
+    explicitPath = args[projectIdx + 1];
+  } else {
+    explicitPath = pathArgs[0];
   }
-  const projectRoot = path.resolve(projectPath);
+  const projectRoot = await resolveProject(explicitPath);
   const git = simpleGit(projectRoot);
 
   // Step 1: Commit + push any pending .lodestar.md changes before synthesis
@@ -259,7 +279,7 @@ async function main(): Promise<void> {
       break;
     case "hooks": {
       const { installHooks, removeHooks } = await import("./hooks.js");
-      const projectRoot = path.resolve(args.filter((a) => !a.startsWith("--"))[0] ?? process.cwd());
+      const projectRoot = await resolveProject(args.filter((a) => !a.startsWith("--"))[0]);
       if (args.includes("--remove")) {
         await removeHooks(projectRoot);
         console.error("✓ Lodestar git hooks removed");
@@ -273,18 +293,17 @@ async function main(): Promise<void> {
     }
     case "summary": {
       const { printSummary } = await import("./summary.js");
-      let summaryPath = args.filter((a) => !a.startsWith("--"))[0] ?? process.cwd();
       const summaryProjIdx = args.indexOf("--project");
-      if (summaryProjIdx !== -1 && args[summaryProjIdx + 1]) {
-        summaryPath = args[summaryProjIdx + 1];
-      }
-      const projectRoot = path.resolve(summaryPath);
+      const summaryPathArg = summaryProjIdx !== -1 && args[summaryProjIdx + 1]
+        ? args[summaryProjIdx + 1]
+        : args.filter((a) => !a.startsWith("--"))[0];
+      const projectRoot = await resolveProject(summaryPathArg);
       await printSummary(projectRoot);
       break;
     }
     case "bootstrap": {
       const { bootstrap: runBootstrap } = await import("./bootstrap.js");
-      const projectRoot = path.resolve(args[0] ?? process.cwd());
+      const projectRoot = await resolveProject(args[0]);
       console.error(`Bootstrapping ${projectRoot} ...`);
       const result = await runBootstrap(projectRoot);
       if (!result.success) {
@@ -306,7 +325,7 @@ async function main(): Promise<void> {
       const { runReview } = await import("./review.js");
       const showDiff = args.includes("--diff");
       const pathArgs = args.filter((a) => !a.startsWith("--"));
-      const projectRoot = path.resolve(pathArgs[0] ?? process.cwd());
+      const projectRoot = await resolveProject(pathArgs[0]);
       await runReview({ projectRoot, showDiff });
       break;
     }

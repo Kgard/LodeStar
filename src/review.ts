@@ -60,6 +60,22 @@ async function readBriefHtml(projectRoot: string): Promise<string | null> {
   }
 }
 
+async function killExistingServer(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    exec(`lsof -ti :${port}`, (err, stdout) => {
+      const pids = (stdout ?? "").trim().split("\n").filter(Boolean);
+      if (pids.length === 0) { resolve(); return; }
+      for (const pid of pids) {
+        if (pid !== String(process.pid)) {
+          try { process.kill(Number(pid), "SIGTERM"); } catch { /* already dead */ }
+        }
+      }
+      // Give the old process a moment to release the port
+      setTimeout(resolve, 300);
+    });
+  });
+}
+
 async function tryPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const test = http.createServer();
@@ -140,7 +156,14 @@ export async function runReview(options: {
     res.end(html);
   });
 
-  const port = (await tryPort(PREFERRED_PORT)) ? PREFERRED_PORT : 0;
+  let port: number;
+  if (await tryPort(PREFERRED_PORT)) {
+    port = PREFERRED_PORT;
+  } else {
+    // Kill stale lodestar review server and reclaim the port
+    await killExistingServer(PREFERRED_PORT);
+    port = (await tryPort(PREFERRED_PORT)) ? PREFERRED_PORT : 0;
+  }
 
   server.listen(port, "127.0.0.1", () => {
     const actualPort = (server.address() as AddressInfo).port;

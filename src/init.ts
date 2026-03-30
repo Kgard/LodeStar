@@ -12,6 +12,7 @@ import {
   writeConfig,
   readConfig,
   getConfigPath,
+  setLastProject,
   type LodestarConfig,
   type ProviderName,
 } from "./config.js";
@@ -624,28 +625,24 @@ async function onboardProject(): Promise<void> {
   if (!gitReady) return;
 
   onboardedProjectPath = resolved;
+  await setLastProject(resolved);
 
   if (projectType === "existing") {
-    const hasContext = await hasLodestarContext(resolved);
     const hasCode = await hasExistingCode(resolved);
 
-    if (hasContext) {
-      console.error(`\nFound existing .lodestar.md — running synthesis to refresh...`);
-      const result = await synthesizeContext({ projectRoot: resolved });
-      if (!result.success) {
-        console.error(`✗ ${result.summary}\n`);
-        return;
+    if (hasCode) {
+      const hasContext = await hasLodestarContext(resolved);
+      if (hasContext) {
+        console.error(`\n  Found existing .lodestar.md.\n`);
+      } else {
+        console.error(`\n  This project has existing code but no .lodestar.md.\n`);
       }
-      console.error(`✓ ${result.summary}`);
-      console.error(`  Written to ${result.path}`);
-    } else if (hasCode) {
-      console.error(`\n  This project has existing code but no .lodestar.md.\n`);
 
       const mode = await select({
         message: "How should Lodestar analyze your project?",
         choices: [
-          { name: "Quick scan — capture project structure (no AI cost)", value: "bootstrap" },
-          { name: "Full analysis — AI reads your code and generates a project brief", value: "synthesize" },
+          { name: `Quick scan — ${hasContext ? "merge new" : "capture"} project structure (no AI cost)`, value: "bootstrap" },
+          { name: `Full analysis — AI reads your code and ${hasContext ? "refreshes" : "generates"} a project brief`, value: "synthesize" },
         ],
       });
 

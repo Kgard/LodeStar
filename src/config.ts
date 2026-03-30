@@ -16,6 +16,7 @@ export interface LodestarConfig {
   ollamaHost?: string;
   azureEndpoint?: string;
   azureApiVersion?: string;
+  lastProject?: string;
 }
 
 export interface ConfigResult {
@@ -61,4 +62,11 @@ export async function readConfig(): Promise<ConfigResult> {
 
 export async function writeConfig(config: LodestarConfig): Promise<void> {
   await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf-8");
+}
+
+export async function setLastProject(projectRoot: string): Promise<void> {
+  const result = await readConfig();
+  if (!result.config) return;
+  result.config.lastProject = projectRoot;
+  await writeConfig(result.config);
 }

@@ -6,7 +6,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
 import { simpleGit } from "simple-git";
-import { contextToMarkdown, type LodestarContext, type LodestarFeature, type LodestarIntegration, type LodestarPattern, type LodestarDependency } from "./schema.js";
+import { contextToMarkdown, parseMarkdown, type LodestarContext, type LodestarFeature, type LodestarIntegration, type LodestarPattern, type LodestarDependency } from "./schema.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 const BOOTSTRAP_WARNING = "⚠️ BOOTSTRAPPED — not yet synthesized. Intent fields marked [UNKNOWN] will be populated after your first coding session. Run lodestar save after making changes.";
@@ -182,18 +182,6 @@ export async function bootstrap(projectRoot: string): Promise<BootstrapResult> {
   const projectName = path.basename(resolved);
   const warnings: string[] = [];
 
-  // Check if .lodestar.md already exists
-  try {
-    await fs.access(filePath);
-    return {
-      success: false,
-      path: filePath,
-      summary: ".lodestar.md already exists. Use lodestar save to update it.",
-    };
-  } catch {
-    // Good — no existing file
-  }
-
   // Gather evidence
   const pkg = await readPackageJson(resolved);
   const tree = await readDirectoryTree(resolved);
@@ -209,29 +197,67 @@ export async function bootstrap(projectRoot: string): Promise<BootstrapResult> {
     };
   }
 
-  // Build context from evidence
-  const context: LodestarContext = {
-    meta: {
-      project: projectName,
-      date: new Date().toISOString().slice(0, 10),
-      model: "bootstrap (no LLM)",
-    },
-    projectSummary: extractProjectSummary(readme, pkg),
-    userSegments: [],
-    integrations: inferIntegrations(pkg, configFiles),
-    features: [],
-    futurePhases: [],
-    diagrams: [],
-    decisions: [],
-    patterns: inferPatterns(tree),
-    dependencies: pkg ? extractDependencies(pkg) : [],
-    rejected: [],
-    openQuestions: [],
-    nextSession: [
-      BOOTSTRAP_WARNING,
-      "Run lodestar save after your next coding session to populate decisions, rationale, and open questions.",
-    ],
-  };
+  // Check for existing context to merge into
+  let existing: LodestarContext | null = null;
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    existing = parseMarkdown(raw);
+  } catch {
+    // No existing file — fresh bootstrap
+  }
+
+  const freshDeps = pkg ? extractDependencies(pkg) : [];
+  const freshIntegrations = inferIntegrations(pkg, configFiles);
+  const freshPatterns = inferPatterns(tree);
+
+  let context: LodestarContext;
+
+  if (existing) {
+    // Merge: add new items that don't already exist, keep everything synthesized
+    const existingDepNames = new Set(existing.dependencies.map((d) => d.package));
+    const newDeps = freshDeps.filter((d) => !existingDepNames.has(d.package));
+
+    const existingIntNames = new Set(existing.integrations.map((i) => i.name));
+    const newInts = freshIntegrations.filter((i) => !existingIntNames.has(i.name));
+
+    const existingPatterns = new Set(existing.patterns.map((p) => p.pattern));
+    const newPatterns = freshPatterns.filter((p) => !existingPatterns.has(p.pattern));
+
+    context = {
+      ...existing,
+      meta: { ...existing.meta, date: new Date().toISOString().slice(0, 10) },
+      dependencies: [...existing.dependencies, ...newDeps],
+      integrations: [...existing.integrations, ...newInts],
+      patterns: [...existing.patterns, ...newPatterns],
+    };
+
+    if (newDeps.length === 0 && newInts.length === 0 && newPatterns.length === 0) {
+      warnings.push("No new structural changes detected — existing context is up to date");
+    }
+  } else {
+    context = {
+      meta: {
+        project: projectName,
+        date: new Date().toISOString().slice(0, 10),
+        model: "bootstrap (no LLM)",
+      },
+      projectSummary: extractProjectSummary(readme, pkg),
+      userSegments: [],
+      integrations: freshIntegrations,
+      features: [],
+      futurePhases: [],
+      diagrams: [],
+      decisions: [],
+      patterns: freshPatterns,
+      dependencies: freshDeps,
+      rejected: [],
+      openQuestions: [],
+      nextSession: [
+        BOOTSTRAP_WARNING,
+        "Run lodestar save after your next coding session to populate decisions, rationale, and open questions.",
+      ],
+    };
+  }
 
   if (context.integrations.length === 0) {
     warnings.push("No integrations detected from config files or dependencies");
@@ -250,10 +276,11 @@ export async function bootstrap(projectRoot: string): Promise<BootstrapResult> {
   const intCount = context.integrations.length;
   const patternCount = context.patterns.length;
 
+  const verb = existing ? "Updated" : "Bootstrapped";
   return {
     success: true,
     path: filePath,
-    summary: `Bootstrapped ${projectName}: ${depCount} deps, ${intCount} integrations, ${patternCount} patterns. No LLM call.`,
+    summary: `${verb} ${projectName}: ${depCount} deps, ${intCount} integrations, ${patternCount} patterns. No LLM call.`,
     ...(warnings.length > 0 ? { warnings } : {}),
   };
 }
