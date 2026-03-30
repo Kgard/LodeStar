@@ -64,8 +64,12 @@ jobs:
           cd release
           sha256sum *.tar.gz > SHA256SUMS
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: release/*
-          generate_release_notes: true
+      - name: Publish to public repo
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" release/* \
+            --repo Kgard/lodestar-releases \
+            --title "Lodestar $TAG" \
+            --generate-notes
