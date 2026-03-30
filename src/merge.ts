@@ -135,28 +135,32 @@ function mergeFeatures(
 ): LodestarContext["features"] {
   const result: LodestarContext["features"] = [];
   const matched = new Set<number>();
+  const incomingTitles = incoming.map((f) => f.feature);
 
   for (const prev of existing) {
-    const incomingIdx = incoming.findIndex((f) => normalizeTitle(f.feature) === normalizeTitle(prev.feature));
+    const incomingIdx = findMatchIndex(prev.feature, incomingTitles, matched);
 
     if (incomingIdx !== -1) {
       const inc = incoming[incomingIdx];
       matched.add(incomingIdx);
 
-      // Union capabilities
-      const prevCaps = prev.capabilities ?? [];
-      const incCaps = inc.capabilities ?? [];
-      const capMap = new Map(prevCaps.map((c) => [c.name.toLowerCase(), c]));
-      for (const cap of incCaps) {
-        capMap.set(cap.name.toLowerCase(), cap); // incoming wins on status
-      }
+      // Union capabilities with similarity dedup
+      const mergedCaps = dedupCapabilities([
+        ...(prev.capabilities ?? []),
+        ...(inc.capabilities ?? []),
+      ]);
+
+      // Derive percentage from capability counts
+      const total = mergedCaps.length;
+      const done = mergedCaps.filter((c) => c.status === "done").length;
+      const derivedPercent = total > 0 ? Math.round((done / total) * 100) : inc.percentComplete;
 
       result.push({
         feature: inc.feature,
-        status: inc.status,
-        percentComplete: inc.percentComplete,
+        status: derivedPercent === 100 ? "complete" : derivedPercent === 0 ? "not-started" : "in-progress",
+        percentComplete: derivedPercent,
         notes: inc.notes ?? prev.notes,
-        capabilities: Array.from(capMap.values()),
+        capabilities: mergedCaps,
       });
     } else {
       result.push(prev);
@@ -166,6 +170,31 @@ function mergeFeatures(
   for (let i = 0; i < incoming.length; i++) {
     if (!matched.has(i)) {
       result.push(incoming[i]);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Deduplicate capabilities by similarity. Incoming (later in array) wins on status.
+ */
+function dedupCapabilities(
+  caps: Array<{ name: string; status: "done" | "in-progress" | "planned" }>
+): Array<{ name: string; status: "done" | "in-progress" | "planned" }> {
+  const result: Array<{ name: string; status: "done" | "in-progress" | "planned" }> = [];
+
+  for (const cap of caps) {
+    const normCap = normalizeTitle(cap.name);
+    const existingIdx = result.findIndex(
+      (r) => normalizeTitle(r.name) === normCap || similarity(normalizeTitle(r.name), normCap) >= SIMILARITY_THRESHOLD
+    );
+
+    if (existingIdx !== -1) {
+      // Duplicate — incoming wins on status (later entry = more recent)
+      result[existingIdx] = { name: result[existingIdx].name, status: cap.status };
+    } else {
+      result.push({ ...cap });
     }
   }
 
