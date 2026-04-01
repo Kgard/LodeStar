@@ -168,6 +168,8 @@ async function runStart(args: string[]): Promise<void> {
 
 async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promise<boolean> {
   const isQuick = args.includes("--quick");
+  const diffModeFlag = args.find((a) => a.startsWith("--diff-mode="));
+  const diffMode = diffModeFlag?.split("=")[1] === "last-commit" ? "last-commit" as const : undefined;
   const pathArgs = args.filter((a) => !a.startsWith("--"));
   const projectRoot = await resolveProject(pathArgs[0]);
 
@@ -200,7 +202,7 @@ async function runSave(args: string[], forceMode?: "checkpoint" | "full"): Promi
   }
 
   const mode = forceMode ?? "checkpoint";
-  const result = await synthesizeContext({ projectRoot, sessionNotes: sessionNotes ?? undefined, mode });
+  const result = await synthesizeContext({ projectRoot, sessionNotes: sessionNotes ?? undefined, mode, diffMode });
 
   if (!result.success) {
     console.error(`✗ ${result.summary}`);
@@ -233,18 +235,48 @@ async function runEnd(args: string[]): Promise<void> {
   const projectRoot = await resolveProject(explicitPath);
   const git = simpleGit(projectRoot);
 
-  // Step 1: Commit + push any pending .lodestar.md changes before synthesis
-  // Ensures a fresh commit timestamp exists even if synthesis fails or is interrupted
-  await commitAndPush(git, "chore: update session context");
+  // Step 1: Commit all uncommitted work (excluding .lodestar.md) + push
+  // Closes history gaps for users who forget to commit during a session
+  try {
+    await git.raw(["reset", "HEAD", "--", ".lodestar.md"]);
+  } catch { /* not staged */ }
+  try {
+    const status = await git.raw(["status", "--porcelain"]);
+    // Check for any changes beyond .lodestar.md
+    const hasWork = status.split("\n").some((l) => l.trim() && !l.includes(".lodestar.md"));
+    if (hasWork) {
+      await git.add("-A");
+      try { await git.raw(["reset", "HEAD", "--", ".lodestar.md"]); } catch { /* */ }
+      const timestamp = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+      await git.commit(`chore: lodestar auto-commit work ${timestamp}`, undefined, { "--no-verify": null });
+      console.error(`\n✓ Committed uncommitted work`);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("nothing to commit")) {
+      console.error(`⚠ Could not commit work: ${msg}`);
+    }
+  }
 
-  // Step 2: Synthesize with full model (end-of-session)
-  const success = await runSave(args, "full");
+  // Push #1 — best effort
+  try {
+    await git.push();
+    console.error(`✓ Pushed to remote`);
+  } catch (pushErr) {
+    const pushMsg = pushErr instanceof Error ? pushErr.message : String(pushErr);
+    console.error(`⚠ Could not push: ${pushMsg}`);
+  }
+
+  // Step 2: Synthesize with full model + last-commit diff mode
+  // Working tree is clean after commit #1, so --diff-mode=last-commit reads HEAD~1..HEAD
+  const synthArgs = [...args, "--diff-mode=last-commit"];
+  const success = await runSave(synthArgs, "full");
   if (!success) {
     process.exit(1);
   }
 
   // Step 3: Commit + push the newly synthesized .lodestar.md
-  await commitAndPush(git, "chore: update session context via lodestar end");
+  await commitAndPush(git, "chore: lodestar context update");
 
   // Clear accumulated notes — session is over
   await clearNotes(projectRoot);

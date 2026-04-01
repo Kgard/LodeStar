@@ -1088,6 +1088,9 @@ These were open questions. They are now decided. Do not reopen them.
   Content blur was rejected: bypassed by reading the local file directly. Not enforceable.
   Content depth gating was rejected: punishes free users before they are sold on the value. AHA moment must come before the upgrade prompt.
 
+- [x] **`diffMode` parameter on `lodestar_synthesize` — the interface contract for hook and MCP lifecycle triggers.**
+  `captureGitSnapshot()` accepts `diffMode: 'working-tree' | 'last-commit'`. Default is `'working-tree'` so all existing manual MCP tool calls are unchanged. Hook invocations pass `'last-commit'` explicitly. This is the same contract Phase 1b MCP lifecycle triggers will use: when `lodestar_synthesize` fires on MCP disconnect, it should pass `'last-commit'` if the user committed during the session, or `'working-tree'` if they didn't. The hook always knows which to use; the MCP disconnect handler will need to check `isWorkingTreeClean()` to decide.
+
 ---
 
 ## GTM & distribution model — locked
@@ -1184,6 +1187,9 @@ Reads structural metadata from the filesystem to generate a skeleton `.lodestar.
 - lodestar review --diff — moves from free to Pro, token-gated
 - 30-day history rotation — replaces 3-file free tier limit for Pro subscribers
 - lodestar_diff() — Phase 1b drift detection stub becomes live tool
+
+**Phase 1b known issue — double-fire on synthesis:**
+When both post-commit (git hook) and SessionEnd (Claude Code hook / MCP disconnect) fire in the same session, `lodestar_synthesize` runs twice. The second run overwrites the first. This is acceptable — the final state is always the most current diff — but it is not a bug. `src/synthesize.ts` is designed to be idempotent: re-running synthesis on the same diff produces a valid `.lodestar.md` with no corruption or duplication. History rotation still fires (the first synthesis result gets moved to `.lodestar.history/`), so no context is lost. Do not add dedup logic or locking to prevent double-fire — the simplicity of "last write wins" is intentional.
 
 **Phase 1b infrastructure gate (do not start Phase 1b until):**
 - [ ] Phase 1a gate fully passed (10-session synthesis gate, lodestar review stable)

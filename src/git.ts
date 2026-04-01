@@ -7,6 +7,8 @@ import { simpleGit, type SimpleGit } from "simple-git";
 const LODESTAR_FILENAME = ".lodestar.md";
 const BRIEF_FILES = ["CLAUDE.md", "PRD.md", "BRIEF.md", "lodestar.md"];
 
+export type DiffMode = "working-tree" | "last-commit";
+
 export interface GitSnapshot {
   diff: string;
   committedDiff: string;
@@ -27,6 +29,38 @@ function isGitError(result: GitResult): result is GitError {
 }
 
 export { isGitError };
+
+// --- Exported git helpers for hooks and CLI ---
+
+export async function isWorkingTreeClean(projectRoot: string): Promise<boolean> {
+  const git = simpleGit(path.resolve(projectRoot));
+  try {
+    const status = await git.raw(["status", "--porcelain"]);
+    return status.trim() === "";
+  } catch {
+    return true;
+  }
+}
+
+export async function stageLodestarFile(projectRoot: string): Promise<void> {
+  const git = simpleGit(path.resolve(projectRoot));
+  await git.add(LODESTAR_FILENAME);
+}
+
+export async function stageAll(projectRoot: string): Promise<void> {
+  const git = simpleGit(path.resolve(projectRoot));
+  await git.add("-A");
+}
+
+export async function commitWithMessage(projectRoot: string, message: string): Promise<boolean> {
+  const git = simpleGit(path.resolve(projectRoot));
+  try {
+    await git.commit(message, undefined, { "--no-verify": null });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function isGitRepo(git: SimpleGit): Promise<boolean> {
   try {
@@ -78,7 +112,8 @@ async function findLastSynthesisCommit(
 }
 
 export async function captureGitSnapshot(
-  projectRoot: string
+  projectRoot: string,
+  diffMode: DiffMode = "working-tree"
 ): Promise<GitResult> {
   const resolved = path.resolve(projectRoot);
 
@@ -95,9 +130,69 @@ export async function captureGitSnapshot(
   }
 
   try {
-    // Uncommitted changes
-    const diff = await git.diff(["HEAD"]);
     const status = await git.raw(["status", "--short"]);
+
+    // --- last-commit mode: diff of the most recent commit only ---
+    if (diffMode === "last-commit") {
+      let lastCommitDiff = "";
+      let commitLog = "";
+      let briefDiff: string | null = null;
+      const briefExcludes = BRIEF_FILES.map((f) => `:(exclude)${f}`);
+
+      // Check commit count for first-ever commit edge case
+      let commitCount = 0;
+      try {
+        const countRaw = await git.raw(["rev-list", "--count", "HEAD"]);
+        commitCount = parseInt(countRaw.trim(), 10);
+      } catch {
+        commitCount = 0;
+      }
+
+      if (commitCount <= 1) {
+        // First commit — use git show HEAD
+        try {
+          lastCommitDiff = await git.raw(["show", "--format=", "--stat", "--patch", "HEAD"]);
+        } catch {
+          lastCommitDiff = "";
+        }
+      } else {
+        // Normal case — diff between HEAD~1 and HEAD
+        try {
+          lastCommitDiff = await git.diff(["HEAD~1", "HEAD", "--", ".", ...briefExcludes]);
+        } catch {
+          lastCommitDiff = "";
+        }
+        // Brief diffs from the last commit
+        const briefParts: string[] = [];
+        for (const bf of BRIEF_FILES) {
+          try {
+            const bd = await git.diff(["HEAD~1", "HEAD", "--", bf]);
+            if (bd.trim()) briefParts.push(bd.trim());
+          } catch { /* no changes */ }
+        }
+        if (briefParts.length > 0) briefDiff = briefParts.join("\n");
+      }
+
+      try {
+        commitLog = await git.raw(["log", "--oneline", "-1"]);
+      } catch {
+        commitLog = "";
+      }
+
+      const packageChanges = await getPackageChanges(git, null);
+
+      return {
+        diff: lastCommitDiff || "(no changes in last commit)",
+        committedDiff: "(last-commit mode — see diff above)",
+        commitLog: commitLog.trim() || "(no commits)",
+        status: status.trim() || "(working tree clean)",
+        packageChanges,
+        briefDiff,
+      };
+    }
+
+    // --- working-tree mode (default): existing behavior ---
+    const diff = await git.diff(["HEAD"]);
 
     // Find what's changed since last synthesis
     const lastSynthCommit = await findLastSynthesisCommit(git, resolved);

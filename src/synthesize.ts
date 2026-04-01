@@ -1,9 +1,15 @@
 // lodestar_synthesize() implementation
+//
+// IDEMPOTENCY: This function may be called multiple times for the same session
+// (e.g. post-commit hook + SessionEnd hook both fire). This is by design —
+// each run reads the current git diff, synthesizes, rotates history, and writes.
+// The second run overwrites the first; history rotation preserves the earlier
+// result in .lodestar.history/. No dedup or locking needed — last write wins.
 
 import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
-import { captureGitSnapshot, isGitError } from "./git.js";
+import { captureGitSnapshot, isGitError, type DiffMode } from "./git.js";
 import { readConfig } from "./config.js";
 import { getProvider } from "./providers/index.js";
 import { rotateHistory } from "./history.js";
@@ -23,6 +29,7 @@ export interface SynthesizeInput {
   projectRoot: string;
   sessionNotes?: string;
   mode?: SynthesisMode;
+  diffMode?: DiffMode;
 }
 
 export interface SynthesizeResult {
@@ -42,19 +49,25 @@ function buildInput(parts: {
   sessionNotes: string | null;
   projectName: string;
   existingContext: string | null;
+  diffMode?: DiffMode;
 }): string {
+  const isLastCommit = parts.diffMode === "last-commit";
   const lines: string[] = [];
   lines.push(`**Project:** ${parts.projectName}`);
   lines.push("");
-  lines.push("**Uncommitted changes (git diff HEAD):**");
+  lines.push(isLastCommit
+    ? "**Changes in last commit (git diff HEAD~1..HEAD):**"
+    : "**Uncommitted changes (git diff HEAD):**");
   lines.push("```");
   lines.push(parts.gitDiff);
   lines.push("```");
-  lines.push("");
-  lines.push("**Committed changes since last synthesis:**");
-  lines.push("```");
-  lines.push(parts.committedDiff);
-  lines.push("```");
+  if (!isLastCommit) {
+    lines.push("");
+    lines.push("**Committed changes since last synthesis:**");
+    lines.push("```");
+    lines.push(parts.committedDiff);
+    lines.push("```");
+  }
   if (parts.briefDiff) {
     lines.push("");
     lines.push("**Project brief changes (CLAUDE.md / PRD.md):**");
@@ -283,7 +296,8 @@ export async function synthesizeContext(
   const provider = getProvider(configResult.config, mode);
 
   // Capture git state
-  const gitResult = await captureGitSnapshot(resolved);
+  const diffMode = input.diffMode ?? "working-tree";
+  const gitResult = await captureGitSnapshot(resolved, diffMode);
   if (isGitError(gitResult)) {
     return { success: false, path: filePath, summary: gitResult.error };
   }
@@ -415,6 +429,7 @@ export async function synthesizeContext(
     sessionNotes: input.sessionNotes ?? null,
     projectName,
     existingContext: contextWithVerification,
+    diffMode,
   });
 
   // Call LLM
