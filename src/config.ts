@@ -17,6 +17,7 @@ export interface LodestarConfig {
   azureEndpoint?: string;
   azureApiVersion?: string;
   lastProject?: string;
+  installId?: string;
 }
 
 export interface ConfigResult {
