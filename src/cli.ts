@@ -80,6 +80,7 @@ Commands:
   lodestar hooks [path]            Install git hooks (auto-save on commit, full sync on push)
   lodestar hooks --remove [path]   Remove git hooks
 
+  lodestar update                   Update to the latest version
   lodestar init                    First-time setup (provider + API key)
   lodestar help                    Show this message
 
@@ -296,6 +297,11 @@ async function main(): Promise<void> {
   fireVersionCheck(command ?? "help");
 
   switch (command) {
+    case "update": {
+      const { runUpdate } = await import("./update.js");
+      await runUpdate();
+      break;
+    }
     case "init":
       await runInit();
       break;
