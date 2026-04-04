@@ -10,6 +10,7 @@ import { synthesizeContext } from "./synthesize.js";
 import { load } from "./load.js";
 import { addNote, getNotes, clearNotes } from "./notes.js";
 import { readConfig } from "./config.js";
+import { fireVersionCheck } from "./version.js";
 import type { SimpleGit } from "simple-git";
 
 async function resolveProject(pathArg: string | undefined): Promise<string> {
@@ -290,6 +291,9 @@ To resume: lodestar start
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
+
+  // Non-blocking telemetry ping — fire and forget
+  fireVersionCheck(command ?? "help");
 
   switch (command) {
     case "init":
