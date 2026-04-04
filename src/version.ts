@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { readConfig, writeConfig } from "./config.js";
 
 const CURRENT_VERSION = "0.2.0";
-const CHECK_URL = "https://kylex.io/api/v/check";
+const CHECK_URL = "https://www.kylex.io/api/v/check";
 const TIMEOUT_MS = 3000;
 
 export function getCurrentVersion(): string {
