@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-macos:
     strategy:
       matrix:
         include:
@@ -17,6 +17,66 @@ jobs:
             target: macos-arm64
           - os: macos-latest
             target: macos-x64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run bundle
+
+      - run: node scripts/package.mjs --target=${{ matrix.target }}
+
+      - name: Import Apple certificate
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+
+      - name: Sign binary
+        run: |
+          BINARY=bin/${{ matrix.target }}/lodestar
+          codesign --force --options runtime --sign "Developer ID Application: Kenley Gard (A6PV4ZSTTQ)" "$BINARY"
+          codesign --verify --verbose "$BINARY"
+
+      - name: Notarize binary
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          BINARY=bin/${{ matrix.target }}/lodestar
+          ZIP_PATH=$RUNNER_TEMP/lodestar-${{ matrix.target }}.zip
+          ditto -c -k --keepParent "$BINARY" "$ZIP_PATH"
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: bin/${{ matrix.target }}/
+
+  build-other:
+    strategy:
+      matrix:
+        include:
           - os: ubuntu-latest
             target: linux-x64
           - os: windows-latest
@@ -42,7 +102,7 @@ jobs:
           path: bin/${{ matrix.target }}/
 
   release:
-    needs: build
+    needs: [build-macos, build-other]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
