@@ -55,10 +55,10 @@ jobs:
           for dir in artifacts/*/; do
             target=$(basename "$dir")
             if [ "$target" = "windows-x64" ]; then
-              tar -czf "release/lodestar-${target}.tar.gz" -C "$dir" lodestar.exe lodestar-mcp.exe
+              tar -czf "release/lodestar-${target}.tar.gz" -C "$dir" lodestar.exe
             else
-              chmod +x "$dir/lodestar" "$dir/lodestar-mcp"
-              tar -czf "release/lodestar-${target}.tar.gz" -C "$dir" lodestar lodestar-mcp
+              chmod +x "$dir/lodestar"
+              tar -czf "release/lodestar-${target}.tar.gz" -C "$dir" lodestar
             fi
           done
           cd release

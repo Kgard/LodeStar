@@ -82,6 +82,7 @@ Commands:
 
   lodestar update                   Update to the latest version
   lodestar init                    First-time setup (provider + API key)
+  lodestar mcp                     Run MCP server (used by AI coding tools)
   lodestar help                    Show this message
 
   [path] is not required if you are in the project directory.
@@ -369,6 +370,12 @@ async function main(): Promise<void> {
       const pathArgs = args.filter((a) => !a.startsWith("--"));
       const projectRoot = await resolveProject(pathArgs[0]);
       await runReview({ projectRoot, showDiff });
+      break;
+    }
+    case "mcp": {
+      // Run MCP server — stdio transport, no telemetry ping
+      const { runMcpServer } = await import("./mcp.js");
+      await runMcpServer();
       break;
     }
     case "help":

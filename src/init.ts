@@ -94,18 +94,28 @@ async function detectInstalledTools(): Promise<CodingTool[]> {
 }
 
 function getLodestarServerEntry(): Record<string, unknown> {
-  // Resolve index.js relative to this file
-  // Works in both ESM (import.meta.url) and CJS (__dirname) contexts
+  // Single binary: `lodestar mcp` runs the MCP server
+  // Check if running as compiled binary or via node
+  const argv0 = process.argv[0];
+  if (!argv0.includes("node")) {
+    // Compiled binary — use the binary path directly
+    return {
+      command: argv0,
+      args: ["mcp"],
+    };
+  }
+
+  // Dev mode / npm link — use node + cli.js path
   let dir: string;
   try {
     dir = path.dirname(new URL(import.meta.url).pathname);
   } catch {
     dir = __dirname;
   }
-  const indexPath = path.resolve(dir, "index.js");
+  const cliPath = path.resolve(dir, "cli.js");
   return {
     command: "node",
-    args: [indexPath],
+    args: [cliPath, "mcp"],
   };
 }
 

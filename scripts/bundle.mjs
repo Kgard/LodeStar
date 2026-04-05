@@ -1,4 +1,4 @@
-// Bundle CLI and MCP server into single CJS files for pkg
+// Bundle CLI (includes MCP server) into a single CJS file for pkg
 
 import * as esbuild from "esbuild";
 import fs from "node:fs";
@@ -39,24 +39,14 @@ const sharedOptions = {
   sourcemap: false,
 };
 
-// Bundle CLI
+// Single bundle — CLI entry point includes MCP via `lodestar mcp` subcommand
 await esbuild.build({
   ...sharedOptions,
   entryPoints: [`${DIST}/cli.js`],
   outfile: `${BUNDLE}/cli.cjs`,
 });
 
-// Bundle MCP server
-await esbuild.build({
-  ...sharedOptions,
-  entryPoints: [`${DIST}/index.js`],
-  outfile: `${BUNDLE}/index.cjs`,
-});
-
-// Verify bundles work
-console.log("✓ Bundled cli.cjs and index.cjs");
+console.log("✓ Bundled cli.cjs (includes MCP server)");
 
 const cliSize = (fs.statSync(`${BUNDLE}/cli.cjs`).size / 1024).toFixed(0);
-const mcpSize = (fs.statSync(`${BUNDLE}/index.cjs`).size / 1024).toFixed(0);
 console.log(`  cli.cjs: ${cliSize} KB`);
-console.log(`  index.cjs: ${mcpSize} KB`);
