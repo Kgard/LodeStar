@@ -3,11 +3,8 @@
 
 import path from "node:path";
 import fs from "node:fs/promises";
-import { createRequire } from "node:module";
 import { parseMarkdown, type LodestarContext } from "./schema.js";
-
-const require = createRequire(import.meta.url);
-const { version } = require("../package.json") as { version: string };
+import { getCurrentVersion } from "./version.js";
 
 const LODESTAR_FILENAME = ".lodestar.md";
 
@@ -69,7 +66,7 @@ export async function printSummary(projectRoot: string): Promise<void> {
 
   console.error("");
   console.error(`  ${divider}`);
-  console.error(`  Lodestar by kylex.io  v${version}  ·  ${projectName}${ageNote ? `  ·  ${ageNote}` : ""}`);
+  console.error(`  Lodestar by kylex.io  v${getCurrentVersion()}  ·  ${projectName}${ageNote ? `  ·  ${ageNote}` : ""}`);
   console.error(`  ${divider}`);
 
   // Next session bullets — primary content
