@@ -15,7 +15,7 @@ import path from "node:path";
 const LOCK_FILENAME = ".lodestar.synthesizing";
 
 const server = new Server(
-  { name: "lodestar", version: "0.1.0" },
+  { name: "lodestar", version: "0.3.0" },
   { capabilities: { tools: {} } }
 );
 

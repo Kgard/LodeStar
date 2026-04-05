@@ -6,7 +6,7 @@ import os from "node:os";
 import crypto from "node:crypto";
 import { readConfig, writeConfig } from "./config.js";
 
-const CURRENT_VERSION = "0.2.0";
+const CURRENT_VERSION = "0.3.0";
 const CHECK_URL = "https://www.kylex.io/api/v/check";
 const TIMEOUT_MS = 3000;
 const NOTIFY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
