@@ -27,7 +27,7 @@ export class AzureProvider implements LLMProvider {
   async synthesize(prompt: string, input: string): Promise<string> {
     const response = await this.client.chat.completions.create({
       model: this.model,
-      max_tokens: 8192,
+      max_tokens: 16384,
       messages: [{ role: "user", content: `${prompt}\n\n${input}` }],
     });
 
