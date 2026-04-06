@@ -61,6 +61,8 @@ Code diffs and brief diffs are separated intentionally. Brief changes represent 
 {{package_changes}}
 ```
 
+**Today's date:** {{current_date}}
+
 **Developer session notes:**
 {{session_notes}}
 

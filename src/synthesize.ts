@@ -91,6 +91,8 @@ function buildInput(parts: {
   lines.push(parts.packageChanges ?? "No changes");
   lines.push("```");
   lines.push("");
+  lines.push(`**Today's date:** ${new Date().toISOString().slice(0, 10)}`);
+  lines.push("");
   lines.push("**Developer session notes:**");
   lines.push(parts.sessionNotes ?? "None provided");
   lines.push("");
