@@ -16,3 +16,4 @@ Call lodestar_synthesize with projectRoot set to the workspace root. Include any
 ## Rules
 - Always use the workspace root as projectRoot
 - Don't modify .lodestar.md directly — only Lodestar writes to it
+
