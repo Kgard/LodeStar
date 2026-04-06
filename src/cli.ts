@@ -108,64 +108,62 @@ async function isFirstRun(projectRoot: string): Promise<boolean> {
 }
 
 async function runStart(args: string[]): Promise<void> {
-  const projectRoot = await resolveProject(args[0]);
+  const projectFlag = args.find((a) => a.startsWith("--project="));
+  const projectIdx = args.indexOf("--project");
+  const pathArgs = args.filter((a) => !a.startsWith("--"));
 
-  const result = await load(projectRoot);
+  let explicitPath: string | undefined;
+  if (projectFlag) {
+    explicitPath = projectFlag.split("=")[1];
+  } else if (projectIdx !== -1 && args[projectIdx + 1]) {
+    explicitPath = args[projectIdx + 1];
+  } else {
+    explicitPath = pathArgs[0];
+  }
+  const projectRoot = await resolveProject(explicitPath);
 
-  if (!result.success) {
-    console.error(`✗ ${result.summary}`);
-    process.exit(1);
+  // Step 1: Synthesize to catch up — ensures .lodestar.md reflects latest state
+  const hasContext = !await isFirstRun(projectRoot);
+  if (hasContext) {
+    console.error("Updating session context...");
+    try {
+      const synthResult = await synthesizeContext({
+        projectRoot,
+        mode: "checkpoint",
+        diffMode: "last-commit",
+      });
+      if (synthResult.success) {
+        console.error(`✓ ${synthResult.summary}`);
+      } else {
+        console.error(`⚠ Synthesis skipped: ${synthResult.summary}`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`⚠ Synthesis skipped: ${msg}`);
+    }
   }
 
-  if (!result.context) {
-    console.error(result.summary);
-    return;
-  }
-
-  const c = result.context;
-
-  // Print the terminal summary first
+  // Step 2: Print terminal summary
   const { printSummary } = await import("./summary.js");
   await printSummary(projectRoot);
 
-  // Print formatted context below
-  if (c.features.length > 0) {
-    console.error("  Build Status:");
-    for (const f of c.features) {
-      const icon = f.status === "complete" ? "✓" : f.status === "in-progress" ? "○" : "·";
-      console.error(`    ${icon} ${f.feature} — ${f.percentComplete}%`);
-      if (f.capabilities && f.capabilities.length > 0) {
-        for (const cap of f.capabilities) {
-          const capIcon = cap.status === "done" ? "✓" : cap.status === "in-progress" ? "○" : "·";
-          console.error(`      ${capIcon} ${cap.name}`);
-        }
-      }
-    }
-    console.error("");
-  }
-
-  if (c.decisions.length > 0) {
-    console.error(`  Last Session Decisions (${c.decisions.length}):`);
-    for (const d of c.decisions) {
-      console.error(`    • ${d.decision}`);
-    }
-    console.error("");
-    console.error("  Full decision history → lodestar review");
-    console.error("");
-  }
-
-  if (c.openQuestions.length > 0) {
-    console.error(`  Open Questions (${c.openQuestions.length}):`);
-    for (const q of c.openQuestions) {
-      console.error(`    ${q.blocking ? "⚠" : "•"} ${q.question}`);
-    }
-    console.error("");
-  }
-
-  if (result.warnings) {
-    for (const w of result.warnings) {
-      console.error(`  ⚠ ${w}`);
-    }
+  // Step 3: Open review in a detached background process so the hook can exit
+  try {
+    const { spawn } = await import("node:child_process");
+    const child = spawn(process.execPath, [
+      ...process.execArgv,
+      path.resolve(import.meta.dirname, "cli.js"),
+      "review",
+      projectRoot,
+    ], {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    console.error("  Opening lodestar review in browser...");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`⚠ Could not open review: ${msg}`);
   }
 }
 

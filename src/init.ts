@@ -863,7 +863,7 @@ export async function runInit(): Promise<void> {
     if (!startAlreadyInstalled) {
       sessionStart.push({
         matcher: "",
-        hooks: [{ type: "command", command: "lodestar summary --project ." }],
+        hooks: [{ type: "command", command: "lodestar start --project ." }],
       });
       hooks.SessionStart = sessionStart;
     }
