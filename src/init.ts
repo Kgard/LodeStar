@@ -826,16 +826,17 @@ export async function runInit(): Promise<void> {
     console.error("⚠ Could not install git hooks — you can add them later with lodestar hooks");
   }
 
-  // Claude Code session hooks — auto-install in the project directory
+  // Claude Code session hooks — install globally so they fire for every project
   let sessionHooksInstalled = false;
-  const claudeSettingsDir = path.join(hookRoot, ".claude");
-  const claudeSettingsPath = path.join(claudeSettingsDir, "settings.json");
+  const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
+  const globalClaudeSettingsDir = path.join(homeDir, ".claude");
+  const globalClaudeSettingsPath = path.join(globalClaudeSettingsDir, "settings.json");
   try {
-    await fs.mkdir(claudeSettingsDir, { recursive: true });
+    await fs.mkdir(globalClaudeSettingsDir, { recursive: true });
 
     let settings: Record<string, unknown> = {};
     try {
-      const raw = await fs.readFile(claudeSettingsPath, "utf-8");
+      const raw = await fs.readFile(globalClaudeSettingsPath, "utf-8");
       settings = JSON.parse(raw) as Record<string, unknown>;
     } catch {
       // New file
@@ -843,35 +844,45 @@ export async function runInit(): Promise<void> {
 
     const hooks = (settings.hooks ?? {}) as Record<string, unknown>;
 
+    // Check for existing lodestar hooks (old or new format)
+    const hasLodestarHook = (entries: Array<Record<string, unknown>>): boolean =>
+      entries.some((entry) => {
+        // New format: { matcher, hooks: [{ type, command }] }
+        const innerHooks = entry.hooks as Array<Record<string, unknown>> | undefined;
+        if (Array.isArray(innerHooks)) {
+          return innerHooks.some((h) =>
+            typeof h.command === "string" && h.command.includes("lodestar")
+          );
+        }
+        // Old format: { command, event }
+        return typeof entry.command === "string" && entry.command.includes("lodestar");
+      });
+
     const sessionStart = (hooks.SessionStart ?? []) as Array<Record<string, unknown>>;
-    const startInstalled = sessionStart.some((h) =>
-      typeof h.command === "string" && h.command.includes("lodestar")
-    );
-    if (!startInstalled) {
+    const startAlreadyInstalled = hasLodestarHook(sessionStart);
+    if (!startAlreadyInstalled) {
       sessionStart.push({
-        command: "lodestar summary --project .",
-        event: "SessionStart",
+        matcher: "",
+        hooks: [{ type: "command", command: "lodestar summary --project ." }],
       });
       hooks.SessionStart = sessionStart;
     }
 
     const sessionEnd = (hooks.SessionEnd ?? []) as Array<Record<string, unknown>>;
-    const endInstalled = sessionEnd.some((h) =>
-      typeof h.command === "string" && h.command.includes("lodestar")
-    );
-    if (!endInstalled) {
+    const endAlreadyInstalled = hasLodestarHook(sessionEnd);
+    if (!endAlreadyInstalled) {
       sessionEnd.push({
-        command: "lodestar end --project .",
-        event: "SessionEnd",
+        matcher: "",
+        hooks: [{ type: "command", command: "lodestar end --project ." }],
       });
       hooks.SessionEnd = sessionEnd;
     }
 
     settings.hooks = hooks;
-    await fs.writeFile(claudeSettingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+    await fs.writeFile(globalClaudeSettingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
 
-    if (!startInstalled || !endInstalled) {
-      console.error("✓ Claude Code session hooks installed (auto-load + auto-save)");
+    if (!startAlreadyInstalled || !endAlreadyInstalled) {
+      console.error("✓ Claude Code session hooks installed globally (auto-load + auto-save)");
       sessionHooksInstalled = true;
     } else {
       console.error("✓ Claude Code session hooks already installed");
