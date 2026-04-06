@@ -1108,15 +1108,14 @@ Binary-only distribution via two parallel tracks. Both deliver the same compiled
 - Landing page with email input form
 - Single opt-in (not double opt-in — developer audience, lower friction)
 - GDPR checkbox on form: one line stating what they're signing up for
-- On submit: Beehiiv API call → immediate welcome email with download link
+- On submit: Loops API call → immediate welcome email with download link
 - Welcome email delivers binary download link in the first line — no delay, no confirmation loop
 - This track drives newsletter subscribers and founding member signups
 
-**Email provider: Beehiiv**
-- Newsletter-native, clean analytics, referral program built in
-- $0 up to 2,500 subscribers
+**Email provider: Loops (loops.so)**
+- Transactional + marketing email in one platform
 - API available for triggered welcome emails on signup
-- Do not use Mailchimp, ConvertKit, or any other provider
+- Do not use Mailchimp, ConvertKit, Beehiiv, or any other provider
 
 **Version check: GitHub Releases API**
 - GET `https://api.github.com/repos/kylex-labs/lodestar/releases/latest`
