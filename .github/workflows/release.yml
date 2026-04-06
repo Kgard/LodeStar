@@ -79,7 +79,7 @@ jobs:
 
   macos-x64:
     if: inputs.target == 'macos-x64' || inputs.target == 'all' || github.event_name == 'push'
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
