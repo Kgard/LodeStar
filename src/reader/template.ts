@@ -525,6 +525,55 @@ body {
 }
 .footer a { color: var(--brass); text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
+.community-cta {
+  max-width: 420px;
+  margin: 1.5rem auto 0;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+.community-cta p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0 0 0.6rem;
+}
+.community-cta form {
+  display: flex;
+  gap: 0.4rem;
+}
+.community-cta input[type="email"] {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-primary);
+  outline: none;
+}
+.community-cta input[type="email"]:focus {
+  border-color: var(--brass);
+}
+.community-cta button {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--brass);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.community-cta button:hover {
+  opacity: 0.9;
+}
+.community-cta .cta-success {
+  font-size: 0.8rem;
+  color: var(--add);
+  margin: 0;
+}
 .brief-section {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1244,6 +1293,14 @@ ${prd ? (() => {
 `}
 </div><!-- end tab-requirements -->
 
+<div class="community-cta" id="community-cta">
+  <p>Want the latest updates and Lodestar news? Join our community!</p>
+  <form id="cta-form">
+    <input type="email" placeholder="you@example.com" required />
+    <button type="submit">Subscribe</button>
+  </form>
+</div>
+
 <div class="footer">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 72" width="14" height="28" style="vertical-align:middle;margin-right:4px"><path d="M28,8 L29.9,41.1 L43,44 L29.9,46.9 L28,58 L26.1,46.9 L15,44 L26.1,41.1 Z" fill="#185FA5" opacity="0.4"/></svg>
   Lodestar &middot; Kylex Module 00 &middot; <a href="https://kylex.io">kylex.io</a>
@@ -1333,6 +1390,36 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+</script>
+<script>
+(function() {
+  var form = document.getElementById('cta-form');
+  var cta = document.getElementById('community-cta');
+  if (!form || !cta) return;
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var email = form.querySelector('input[type="email"]').value;
+    var btn = form.querySelector('button');
+    if (!email) return;
+    btn.disabled = true;
+    btn.textContent = '...';
+    fetch('https://kylex.io/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, source: 'lodestar_review', newsletter: true })
+    }).then(function(res) {
+      if (res.ok) {
+        cta.innerHTML = '<p class="cta-success">Subscribed! No spam, ever.</p>';
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Subscribe';
+      }
+    }).catch(function() {
+      btn.disabled = false;
+      btn.textContent = 'Subscribe';
+    });
+  });
+})();
 </script>
 </body>
 </html>`;

@@ -899,7 +899,6 @@ ${hasClaudeDesktop ? `
     After restarting, you can ask Claude to "load lodestar context"
     or "synthesize this session" and it will use the MCP tools.
 ` : ""}${gitHooksInstalled ? "  Git hooks active — auto-updates on commit, full sync on push.\n" : ""}
-Sign up for Kylex updates: kylex.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   } else {
     // No session hooks — user needs to know about manual commands
@@ -919,7 +918,33 @@ ${hasClaudeDesktop ? `
     After restarting, you can ask Claude to "load lodestar context"
     or "synthesize this session" and it will use the MCP tools.
 ` : ""}${gitHooksInstalled ? "  Git hooks active — auto-updates on commit, full sync on push.\n" : ""}
-Sign up for Kylex updates: kylex.io
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+  }
+
+  // Optional email capture — highest intent moment
+  console.error("");
+  try {
+    const email = await input({
+      message: "Get release updates and Lodestar news (optional — press Enter to skip):",
+      validate: (v) => {
+        if (v === "") return true;
+        return v.includes("@") || "Enter a valid email or press Enter to skip";
+      },
+    });
+    if (email && email.includes("@")) {
+      try {
+        await fetch("https://kylex.io/api/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, source: "lodestar_init", newsletter: true }),
+          signal: AbortSignal.timeout(5000),
+        });
+        console.error("  ✓ Subscribed. No spam, ever.\n");
+      } catch {
+        console.error("  Couldn't reach the server — sign up anytime at kylex.io\n");
+      }
+    }
+  } catch {
+    // User pressed Ctrl+C or prompt was cancelled — no problem
   }
 }
