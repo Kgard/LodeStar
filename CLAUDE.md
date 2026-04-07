@@ -1,7 +1,7 @@
 # Lodestar — Claude Code Build Instructions
 
 > Module 00 of the **Kylex** suite (kylex.io)  
-> Titania Labs LLC — Confidential  
+> Kylex LLC — Confidential  
 > Version: Phase 1a
 
 ---
@@ -44,7 +44,7 @@ If a feature idea arises that belongs to a later phase, add it to `## Future Pha
 | Tagline | "Every session remembers where you left off." |
 | Revenue model | Free tier: BYOK, single-project, manual CLI — community candy, newsletter capture. Pro tier: $9.99/month — Kylex-hosted synthesis, mid-session checkpoints, session diff, 30-day history, 200 calls/month included. |
 | Primary user | Solo vibe-coding founders using Claude Code, Cursor, Windsurf, or any AI coding tool |
-| Owner | Ken / Titania Labs LLC |
+| Owner | Ken / Kylex LLC |
 
 ---
 
@@ -1220,5 +1220,5 @@ When both post-commit (git hook) and SessionEnd (Claude Code hook / MCP disconne
 
 ---
 
-*Lodestar — Kylex Module 00 — Titania Labs LLC*
+*Lodestar — Kylex Module 00*
 *kylex.io — Binary distribution, closed source*

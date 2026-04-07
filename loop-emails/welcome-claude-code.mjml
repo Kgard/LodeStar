@@ -1,0 +1,187 @@
+<mjml>
+  <mj-head>
+    <mj-title>Get Started with Lodestar + Claude Code</mj-title>
+    <mj-preview>Your setup guide for Claude Code. Up and running in under 2 minutes.</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" />
+      <mj-text font-size="14px" color="#334155" line-height="1.6" padding="0 0 12px 0" />
+      <mj-section background-color="#f8fafc" padding="0 24px" />
+      <mj-divider border-color="#e2e8f0" border-width="1px" padding="24px 0" />
+    </mj-attributes>
+    <mj-style>
+      .step-num { display: inline-block; width: 28px; height: 28px; border-radius: 50%; background: #185FA5; color: white; font-weight: 700; font-size: 13px; line-height: 28px; text-align: center; margin-right: 10px; vertical-align: middle; }
+      .check { color: #185FA5; margin-right: 6px; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#f8fafc">
+
+    <!-- Header -->
+    <mj-section padding="40px 24px 8px">
+      <mj-column>
+        <mj-text align="center" font-size="24px" color="#0C447C" font-weight="700">Welcome to Lodestar</mj-text>
+        <mj-text align="center" font-size="14px" color="#64748b">Your setup guide for Claude Code. Up and running in under 2 minutes.</mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Mode note -->
+    <mj-section padding="8px 24px">
+      <mj-column>
+        <mj-text padding="0">
+          <div style="background-color:#E6F1FB;border-radius:8px;padding:12px 16px;font-size:13px;color:#0C447C">
+            <strong>Claude Code CLI</strong> &mdash; sessions are fully automatic after init.
+          </div>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Step 1 -->
+    <mj-section padding="16px 24px 0">
+      <mj-column>
+        <mj-text font-size="16px" color="#0C447C" font-weight="600">
+          <span class="step-num">1</span> Install Lodestar
+        </mj-text>
+        <mj-text font-size="14px" color="#64748b" padding="0 0 8px 0">One command. macOS, Linux, Intel or Apple Silicon.</mj-text>
+        <mj-text padding="0 0 12px 0">
+          <div style="background-color:#0f172a;border-radius:8px;padding:12px 16px;font-family:'SF Mono',Monaco,monospace;font-size:13px;color:#4ade80">
+            curl -fsSL kylex.io/install | sh
+          </div>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Step 2 -->
+    <mj-section padding="24px 24px 0">
+      <mj-column>
+        <mj-text font-size="16px" color="#0C447C" font-weight="600">
+          <span class="step-num">2</span> Run the setup wizard
+        </mj-text>
+        <mj-text font-size="14px" color="#64748b" padding="0 0 8px 0">Navigate to your project directory, then run init:</mj-text>
+        <mj-text padding="0 0 12px 0">
+          <div style="background-color:#0f172a;border-radius:8px;padding:12px 16px;font-family:'SF Mono',Monaco,monospace;font-size:13px;color:#4ade80">
+            <span style="color:#64748b">cd ~/your-project</span><br/>lodestar init
+          </div>
+        </mj-text>
+        <mj-text padding="0 0 12px 0">
+          <div style="background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:16px">
+          <div style="color:#185FA5;font-weight:600;font-size:12px;margin-bottom:8px">The wizard will:</div>
+          <div style="font-size:13px;color:#475569;margin-bottom:6px"><span class="check">&#10003;</span> Check git is installed (offers to install via Homebrew if not)</div>
+          <div style="font-size:13px;color:#475569;margin-bottom:6px"><span class="check">&#10003;</span> Set up your AI provider (Anthropic, OpenAI, Google, Azure, or Ollama)</div>
+          <div style="font-size:13px;color:#475569;margin-bottom:6px"><span class="check">&#10003;</span> Validate your API key</div>
+          <div style="font-size:13px;color:#475569;margin-bottom:6px"><span class="check">&#10003;</span> Ask if this is a new or existing project</div>
+          <div style="font-size:13px;color:#475569;margin-bottom:6px"><span class="check">&#10003;</span> Bootstrap existing projects (quick scan or full AI analysis)</div>
+          <div style="font-size:13px;color:#475569"><span class="check">&#10003;</span> Auto-install git hooks + session hooks</div>
+          </div>
+        </mj-text>
+        <mj-text font-size="12px" color="#94a3b8">Sessions are fully automatic after init. Context loads on open, saves on close.</mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Step 3 -->
+    <mj-section padding="24px 24px 0">
+      <mj-column>
+        <mj-text font-size="16px" color="#0C447C" font-weight="600">
+          <span class="step-num">3</span> Start coding
+        </mj-text>
+        <mj-text font-size="14px" color="#64748b" padding="0 0 8px 0">That's it. Open Claude Code and start working. When you're done, check the dashboard:</mj-text>
+        <mj-text padding="0 0 12px 0">
+          <div style="background-color:#0f172a;border-radius:8px;padding:12px 16px;font-family:'SF Mono',Monaco,monospace;font-size:13px;color:#4ade80">
+            lodestar review
+          </div>
+        </mj-text>
+        <mj-text font-size="12px" color="#94a3b8">Opens a browser dashboard with feature progress, decisions, architecture diagrams, and session history.</mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column><mj-divider /></mj-column>
+    </mj-section>
+
+    <!-- Claude Desktop note -->
+    <mj-section>
+      <mj-column>
+        <mj-text padding="0">
+          <div style="background-color:#E6F1FB;border-radius:8px;padding:12px 16px;font-size:13px;color:#0C447C">
+            <strong>Using Claude Desktop?</strong> The setup wizard auto-configures MCP settings. After init, restart Claude Desktop to activate the connection. You can then say "load my lodestar context" or "synthesize this session" directly in conversation.
+          </div>
+        </mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column><mj-divider /></mj-column>
+    </mj-section>
+
+    <!-- What happens automatically -->
+    <mj-section>
+      <mj-column>
+        <mj-text align="center" font-size="16px" color="#0C447C" font-weight="600">What happens automatically</mj-text>
+        <mj-text align="center" font-size="13px" color="#64748b" padding="0 0 16px 0">With git hooks installed, Lodestar manages your sessions regardless of which AI coding tool you use.</mj-text>
+        <mj-table font-size="13px" cellpadding="8">
+          <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">
+            <th style="text-align:left;padding:8px 12px;color:#64748b;font-weight:500">Event</th>
+            <th style="text-align:left;padding:8px 12px;color:#64748b;font-weight:500">What Lodestar does</th>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:8px 12px;color:#475569">Session opens</td>
+            <td style="padding:8px 12px;color:#475569">Loads context + prints session summary</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:8px 12px;color:#475569">You commit code</td>
+            <td style="padding:8px 12px;color:#475569">Updates feature progress automatically</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:8px 12px;color:#475569">Session closes</td>
+            <td style="padding:8px 12px;color:#475569">Synthesizes session + commits context</td>
+          </tr>
+        </mj-table>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column><mj-divider /></mj-column>
+    </mj-section>
+
+    <!-- Optional commands -->
+    <mj-section>
+      <mj-column>
+        <mj-text align="center" font-size="16px" color="#0C447C" font-weight="600">Optional commands</mj-text>
+        <mj-text align="center" font-size="13px" color="#64748b" padding="0 0 16px 0">You only need these when you want to.</mj-text>
+        <mj-table font-size="13px" cellpadding="8">
+          <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0">
+            <th style="text-align:left;padding:8px 12px;color:#64748b;font-weight:500">Command</th>
+            <th style="text-align:left;padding:8px 12px;color:#64748b;font-weight:500">What it does</th>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:8px 12px;color:#475569"><code style="font-family:'SF Mono',Monaco,monospace;font-size:11px;color:#185FA5">lodestar save</code></td>
+            <td style="padding:8px 12px;color:#475569">Mid-session checkpoint with optional notes</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:8px 12px;color:#475569"><code style="font-family:'SF Mono',Monaco,monospace;font-size:11px;color:#185FA5">lodestar review</code></td>
+            <td style="padding:8px 12px;color:#475569">Open project dashboard in browser</td>
+          </tr>
+        </mj-table>
+        <mj-text align="center" font-size="12px" color="#94a3b8" padding="16px 0 0 0">That's it. Everything else is automatic.</mj-text>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column><mj-divider /></mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-text align="center" font-size="13px" color="#64748b">Full reference anytime: <a href="https://kylex.io/getting-started" style="color:#185FA5;text-decoration:none;">kylex.io/getting-started</a></mj-text>
+      </mj-column>
+    </mj-section>
+
+    <!-- Footer -->
+    <mj-section padding="0 24px 40px">
+      <mj-column>
+        <mj-divider />
+        <mj-text align="center" font-size="12px" color="#94a3b8" padding="0 0 4px 0">Lodestar &middot; Kylex Module 00 &middot; <a href="https://kylex.io" style="color:#185FA5;text-decoration:none;">kylex.io</a></mj-text>
+        <mj-text align="center" font-size="12px" color="#94a3b8" padding="0 0 4px 0">You're receiving this because you signed up at kylex.io.</mj-text>
+        <mj-text align="center" font-size="12px" color="#94a3b8" padding="0"><a href="{unsubscribe_link}" style="color:#185FA5;text-decoration:none;">Unsubscribe</a></mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
