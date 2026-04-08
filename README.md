@@ -8,7 +8,7 @@ The code is always saved. The thinking behind it wasn't. Lodestar commits your r
 
 Works with Claude Code, Cursor, Windsurf, or whatever you use next.
 
-> [Lodestar by Kylex](https://kylex.io) · Free forever · Titania Labs LLC
+> [Lodestar by Kylex](https://kylex.io) · Free forever · kylex LLC
 
 ---
 
@@ -234,7 +234,7 @@ Lodestar prioritizes architecture and config files over templates and CSS. High-
 
 ## License
 
-Proprietary — Titania Labs LLC
+Proprietary — kylex LLC
 
 ---
 
