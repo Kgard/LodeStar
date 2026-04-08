@@ -1,4 +1,6 @@
 # Lodestar
+![lodestar_demo_v3](https://github.com/user-attachments/assets/8636600a-2841-4cb1-962a-c0d7c0b79b43)
+
 
 **Every AI coding tool remembers what you built. None of them remember why. Until now.**
 
